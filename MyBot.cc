@@ -1,17 +1,12 @@
-#include <iostream>
 #include "PlanetWars.h"
 
-// The DoTurn function is where your code goes. The PlanetWars object contains
-// the state of the game, including information about all planets and fleets
-// that currently exist. Inside this function, you issue orders using the
-// pw.IssueOrder() function. For example, to send 10 ships from planet 3 to
-// planet 8, you would say pw.IssueOrder(3, 8, 10).
-//
-// There is already a basic strategy in place here. You can use it as a
-// starting point, or you can throw it out entirely and replace it with your
-// own. Check out the tutorials and articles on the contest website at
-// http://www.ai-contest.com/resources.
-void DoTurn(const PlanetWars& pw) {
+#include <iostream>
+#include <fstream>
+
+#define LOG(msg) { file << msg; file.flush(); }
+
+void DoTurn(const PlanetWars& pw, std::fstream& file) {
+  /*
   // (1) If we currently have a fleet in flight, just do nothing.
   if (pw.MyFleets().size() >= 1) {
     return;
@@ -48,11 +43,14 @@ void DoTurn(const PlanetWars& pw) {
     int num_ships = source_num_ships / 2;
     pw.IssueOrder(source, dest, num_ships);
   }
+  */
 }
 
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
+  std::fstream file;
+  file.open("mybot.txt", std::ios::in|std::ios::trunc);
   std::string current_line;
   std::string map_data;
   while (true) {
@@ -62,7 +60,7 @@ int main(int argc, char *argv[]) {
       if (current_line.length() >= 2 && current_line.substr(0, 2) == "go") {
         PlanetWars pw(map_data);
         map_data = "";
-        DoTurn(pw);
+        DoTurn(pw, file);
 	pw.FinishTurn();
       } else {
         map_data += current_line;
@@ -70,5 +68,6 @@ int main(int argc, char *argv[]) {
       current_line = "";
     }
   }
+  file.close();
   return 0;
 }
