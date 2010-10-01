@@ -1,8 +1,8 @@
-CC=g++ -O2
+CC=g++ -O2 -Wall -Wextra
 
 all: MyBot
 
 clean:
-	rm -rf *.o MyBot *.txt
+	rm -rf MyBot *.o *.txt
 
 MyBot: MyBot.o PlanetWars.o

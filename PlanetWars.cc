@@ -138,12 +138,14 @@ const Fleet& PlanetWars::GetFleet(int fleet_id) const {
 }
 
 std::vector<Planet> PlanetWars::Planets() const {
+  /*
   std::vector<Planet> r;
   for (int i = 0; i < planets_.size(); ++i) {
     const Planet& p = planets_[i];
     r.push_back(p);
   }
-  return r;
+  */
+  return planets_;
 }
 
 std::vector<Planet> PlanetWars::MyPlanets() const {
