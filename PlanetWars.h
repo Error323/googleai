@@ -80,6 +80,8 @@ class Planet {
          double x,
          double y);
 
+  friend std::ostream& operator<<(std::ostream&, const Planet&);
+
   // Returns the ID of this planets. Planets are numbered starting at zero.
   int PlanetID() const;
 

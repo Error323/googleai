@@ -3,14 +3,17 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <limits>
 #include <cassert>
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #define LOG(msg) { file << msg << std::endl; file.flush(); }
 #else
 #define LOG(msg)
 #endif
+
+unsigned int round = 0;
 
 bool cmp(const Planet& a, const Planet& b) {
 	if (a.GrowthRate() == b.GrowthRate())
@@ -23,20 +26,38 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 	// The overall idea is to maximize growth every turn
 	// (1) determine number of our ships
 	unsigned int numShips = 0;
-	std::vector<Planet> myPlanets, notMyPlanets;
+	std::vector<Fleet> fleets = pw.Fleets();
+	std::vector<Planet*> myPlanets, notMyPlanets;
 	std::vector<Planet> planets = pw.Planets();
 	sort(planets.begin(), planets.end(), cmp);
 	for (unsigned int i = 0, n = planets.size(); i < n; i++)
 	{
-		const Planet& p = planets[i];
-		if (p.Owner() == 1)
+		Planet* p = &planets[i];
+
+		if (p->Owner() == 1)
 		{
-			numShips += p.NumShips() - 1;
+			numShips += p->NumShips() - 1;
 			myPlanets.push_back(p);
 		}
 		else
 		{
-			notMyPlanets.push_back(p);
+			int fleetSize = 0;
+			for (unsigned j = 0, m = fleets.size(); j < m; j++)
+			{
+				const Fleet& f = fleets[j];
+				if (f.DestinationPlanet() == p->PlanetID())
+				{
+					if (f.Owner() == 1)
+						fleetSize += f.NumShips();
+					else
+						fleetSize -= f.NumShips();
+				}
+			}
+			if (fleetSize <= 0)
+			{
+				p->NumShips(p->NumShips() - fleetSize);
+				notMyPlanets.push_back(p);
+			}
 		}
 	}
 
@@ -48,38 +69,42 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 	// (2) determine best planets for attack
 	unsigned int bestGrowthRate = 0;
 	std::vector<unsigned int> skip;
-	std::vector<Planet> bestAttackable;
+	std::vector<Planet*> bestAttackable;
 	while (skip.size() < notMyPlanets.size())
 	{
 		int tmpNumShips = numShips;
 		unsigned int highestNumShips = 0;
 		unsigned int skipIndex = 0;
 		unsigned int growthRate = 0;
-		std::vector<Planet> attackable;
+		unsigned int enemyNumShips = 0;
+		std::vector<Planet*> attackable;
 
 		for (unsigned int i = 0, n = notMyPlanets.size(); i < n; i++)
 		{
 			if (find(skip.begin(), skip.end(), i) != skip.end())
 				continue;
 
-			const Planet& p = notMyPlanets[i];
+			Planet* p = notMyPlanets[i];
 
-			tmpNumShips -= p.NumShips() + 1;
+			tmpNumShips -= p->NumShips() + 1;
 			if (tmpNumShips < 0)
 			{
 				break;
 			}
 
-			growthRate += p.GrowthRate();
-			assert(growthRate <= numShips);
+			growthRate += p->GrowthRate();
 			attackable.push_back(p);
 
-			if (highestNumShips < p.NumShips())
+			enemyNumShips += p->NumShips();
+
+			if (highestNumShips < p->NumShips())
 			{
-				highestNumShips = p.NumShips();
+				highestNumShips = p->NumShips();
 				skipIndex = i;
 			}
 		}
+
+		assert(enemyNumShips < numShips);
 
 		if (growthRate > bestGrowthRate)
 		{
@@ -90,30 +115,31 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 		skip.push_back(skipIndex);
 	}
 
-	// (3) greedily determine shortest routes for attackable planets
+	// (3) consume all the planets
 	for (unsigned int i = 0, n = bestAttackable.size(); i < n; i++)
 	{
-		const Planet& target = bestAttackable[i];
-		Planet& bestSource = myPlanets[0];
-		int bestDistance = pw.Distance(bestSource.PlanetID(), target.PlanetID());
+		Planet* target = bestAttackable[i];
+		const bool isNeutral = target->Owner() == 0;
 		
-		for (unsigned int j = 1, m = myPlanets.size(); j < m; j++)
+		for (unsigned int j = 0, m = myPlanets.size(); j < m; j++)
 		{
-			const Planet& source = myPlanets[j];
-			if (source.NumShips() <= 1)
+			Planet* source = myPlanets[j];
+			if (source->NumShips() <= 1)
 				continue;
 
-			int distance = pw.Distance(source.PlanetID(), target.PlanetID());
-			if (distance < bestDistance)
-			{
-				bestDistance = distance;
-				bestSource = source;
-			}
-		}
+			const int distance = pw.Distance(source->PlanetID(), target->PlanetID());
+			const int targetGrowth = isNeutral ? 0 : distance*target->GrowthRate();
 
-		int fleetSize = std::min<int>(bestSource.NumShips() - 1, target.NumShips() + 1);
-		bestSource.NumShips(bestSource.NumShips() - fleetSize);
-		pw.IssueOrder(bestSource.PlanetID(), target.PlanetID(), fleetSize);
+			int fleetSize = std::min<int>(source->NumShips() - 1, target->NumShips() + targetGrowth + 1);
+
+			pw.IssueOrder(source->PlanetID(), target->PlanetID(), fleetSize);
+			source->NumShips(source->NumShips() - fleetSize);
+			target->NumShips(target->NumShips() - fleetSize + targetGrowth);
+
+			// This planet is ours, proceed to next target
+			if (target->NumShips() < 0)
+				break;
+		}
 	}
 }
 

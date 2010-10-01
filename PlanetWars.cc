@@ -333,3 +333,17 @@ void PlanetWars::FinishTurn() const {
   std::cout << "go" << std::endl;
   std::cout.flush();
 }
+
+std::ostream& operator<<(std::ostream &out, const Planet& p) {
+	out << "Planet{id:";
+	out << p.PlanetID();
+	out << ", owner:";
+	out << (p.Owner() == 1 ? "us" : "them");
+	out << ", numships:";
+	out << p.NumShips();
+	out << ", growthrate:";
+	out << p.GrowthRate();
+	out << "}";
+
+	return out;
+}
