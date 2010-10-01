@@ -10,19 +10,28 @@
 	if (file.good())              \
 	{                             \
 		file << msg << std::endl; \
-		file.flush();             \
 	}
 
 unsigned int round = 0;
 
-bool cmp(const Planet& a, const Planet& b) {
+PlanetWars* planetWars;
+Planet* globalTarget = NULL;
+
+bool cmp1(const Planet& a, const Planet& b) {
 	float x = a.GrowthRate() / (a.NumShips() + 1.0f);
 	float y = b.GrowthRate() / (b.NumShips() + 1.0f);
 	return x > y;
 }
 
-void DoTurn(const PlanetWars& pw, std::ofstream& file) {
-	LOG("round: " << round);
+bool cmp2(const Planet* a, const Planet* b) {
+	float distA = planetWars->Distance(a->PlanetID(), globalTarget->PlanetID());
+	float distB = planetWars->Distance(b->PlanetID(), globalTarget->PlanetID());
+	return distA < distB;
+}
+
+void DoTurn(PlanetWars& pw, std::ofstream& file) {
+	LOG(round);
+	planetWars = &pw;
 
 	// The overall idea is to maximize growth every turn
 	// (1) determine number of our ships and divide planets
@@ -30,7 +39,7 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 
 	std::vector<Planet> planets = pw.Planets();
 	std::vector<Planet*> myPlanets, notMyPlanets;
-	sort(planets.begin(), planets.end(), cmp);
+	sort(planets.begin(), planets.end(), cmp1);
 	for (unsigned int i = 0, n = planets.size(); i < n; i++)
 	{
 		Planet* p = &planets[i];
@@ -76,7 +85,9 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 		{
 			Fleet* f = myFleets[j];
 			if (f->DestinationPlanet() == target->PlanetID())
+			{
 				targetNumShips -= f->NumShips();
+			}
 		}
 
 		// add their incomming fleets
@@ -84,7 +95,9 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 		{
 			Fleet* f = notMyFleets[j];
 			if (f->DestinationPlanet() == target->PlanetID())
+			{
 				targetNumShips += f->NumShips();
+			}
 		}
 
 		// if this target will be ours, we don't need to attack it, skip target
@@ -99,17 +112,24 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 			continue;
 		}
 
+		// sort our sourceplanets on distance from target creating an outwards
+		// spiral
+		globalTarget = target;
+		sort(myPlanets.begin(), myPlanets.end(), cmp2);
+
 		// send fleets until we've captured the planet
 		for (unsigned int j = 0, m = myPlanets.size(); j < m; j++)
 		{
 			Planet* source = myPlanets[j];
+
 			if (source->NumShips() <= 1)
+			{
 				continue;
+			}
 
 			const int distance = pw.Distance(source->PlanetID(), target->PlanetID());
 			const int targetGrowth = isNeutral ? 0 : distance*target->GrowthRate();
-
-			int fleetSize = std::min<int>(source->NumShips() - 1, targetNumShips + targetGrowth + 1);
+			const int fleetSize = std::min<int>(source->NumShips() - 1, targetNumShips + targetGrowth + 1);
 
 			numShips -= fleetSize;
 			pw.IssueOrder(source->PlanetID(), target->PlanetID(), fleetSize);
@@ -118,7 +138,9 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 
 			// This planet is ours, proceed to next target
 			if (target->NumShips() < 0)
+			{
 				break;
+			}
 		}
 	}
 

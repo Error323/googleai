@@ -336,7 +336,7 @@ void PlanetWars::FinishTurn() const {
 
 std::ostream& operator<<(std::ostream &out, const Planet& p) {
 	char data[10];
-	out << "\tPlanet{id:";
+	out << "Planet{id:";
 	snprintf(data, 10, "%2.2d", p.PlanetID());
 	out << data;
 	out << ", owner:";
@@ -360,7 +360,7 @@ std::ostream& operator<<(std::ostream &out, const Planet& p) {
 
 std::ostream& operator<<(std::ostream& out, const Fleet& f) {
 	char data[10];
-	out << "\tFleet{owner:";
+	out << "Fleet{owner:";
 	out << (f.Owner() == 1 ? "U" : "T");
 	out << ", numships:";
 	snprintf(data, 10, "%3.3d", f.NumShips());
