@@ -6,6 +6,8 @@
 #include <limits>
 #include <cassert>
 
+#define VERSION "4.0"
+
 #define LOG(msg)                  \
 	if (file.good())              \
 	{                             \
@@ -151,7 +153,9 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
   std::ofstream file;
-  file.open("mybot.txt", std::ios::in|std::ios::trunc);
+  std::string filename("-Error323-v");
+  filename = argv[0] + filename + VERSION + ".txt";
+  file.open(filename.c_str(), std::ios::in|std::ios::trunc);
   std::string current_line;
   std::string map_data;
   while (true) {
