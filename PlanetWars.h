@@ -59,6 +59,8 @@ class Fleet {
   // this value is 1, then the fleet will hit the destination planet next turn.
   int TurnsRemaining() const;
 
+  friend std::ostream& operator<<(std::ostream&, const Fleet&);
+
  private:
   int owner_;
   int num_ships_;

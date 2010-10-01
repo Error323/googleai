@@ -6,7 +6,7 @@
 #include <limits>
 #include <cassert>
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define LOG(msg) { file << msg << std::endl; file.flush(); }
 #else

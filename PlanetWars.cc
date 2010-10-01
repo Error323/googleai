@@ -347,3 +347,20 @@ std::ostream& operator<<(std::ostream &out, const Planet& p) {
 
 	return out;
 }
+
+std::ostream& operator<<(std::ostream& out, const Fleet& f) {
+	out << "Fleet{owner:";
+	out << (f.Owner() == 1 ? "us" : "them");
+	out << ", numships:";
+	out << f.NumShips();
+	out << ", source:";
+	out << f.SourcePlanet();
+	out << ", dest:";
+	out << f.DestinationPlanet();
+	out << ", totaltriptime:";
+	out << f.TotalTripLength();
+	out << ", remaining:";
+	out << f.TurnsRemaining();
+
+	return out;
+}
