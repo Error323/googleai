@@ -6,29 +6,30 @@
 #include <limits>
 #include <cassert>
 
-#define DEBUG
-#ifdef DEBUG
-#define LOG(msg) { file << msg << std::endl; file.flush(); }
-#else
-#define LOG(msg)
-#endif
+#define LOG(msg)                  \
+	if (file.good())              \
+	{                             \
+		file << msg << std::endl; \
+		file.flush();             \
+	}
 
 unsigned int round = 0;
 
 bool cmp(const Planet& a, const Planet& b) {
-	if (a.GrowthRate() == b.GrowthRate())
-		return a.NumShips() > b.NumShips();
-	else
-		return a.GrowthRate() > b.GrowthRate();
+	float x = a.GrowthRate() / (a.NumShips() + 1.0f);
+	float y = b.GrowthRate() / (b.NumShips() + 1.0f);
+	return x > y;
 }
 
 void DoTurn(const PlanetWars& pw, std::ofstream& file) {
+	LOG("round: " << round);
+
 	// The overall idea is to maximize growth every turn
-	// (1) determine number of our ships
-	unsigned int numShips = 0;
-	std::vector<Fleet> fleets = pw.Fleets();
-	std::vector<Planet*> myPlanets, notMyPlanets;
+	// (1) determine number of our ships and divide planets
+	int numShips = 0;
+
 	std::vector<Planet> planets = pw.Planets();
+	std::vector<Planet*> myPlanets, notMyPlanets;
 	sort(planets.begin(), planets.end(), cmp);
 	for (unsigned int i = 0, n = planets.size(); i < n; i++)
 	{
@@ -36,91 +37,69 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 
 		if (p->Owner() == 1)
 		{
-			numShips += p->NumShips() - 1;
+			numShips += p->NumShips();
 			myPlanets.push_back(p);
 		}
 		else
 		{
-			int fleetSize = 0;
-			for (unsigned j = 0, m = fleets.size(); j < m; j++)
-			{
-				const Fleet& f = fleets[j];
-				if (f.DestinationPlanet() == p->PlanetID())
-				{
-					if (f.Owner() == 1)
-						fleetSize += f.NumShips();
-					else
-						fleetSize -= f.NumShips();
-				}
-			}
-			if (fleetSize <= 0)
-			{
-				p->NumShips(p->NumShips() - fleetSize);
-				notMyPlanets.push_back(p);
-			}
+			notMyPlanets.push_back(p);
 		}
 	}
 
-	if (numShips < 1)
+	// (2) divide fleets
+	std::vector<Fleet> fleets = pw.Fleets();
+	std::vector<Fleet*> myFleets, notMyFleets;
+	for (unsigned int i = 0, n = fleets.size(); i < n; i++)
 	{
-		return;
-	}
+		Fleet* f = &fleets[i];
 
-	// (2) determine best planets for attack
-	unsigned int bestGrowthRate = 0;
-	std::vector<unsigned int> skip;
-	std::vector<Planet*> bestAttackable;
-	while (skip.size() < notMyPlanets.size())
-	{
-		int tmpNumShips = numShips;
-		unsigned int highestNumShips = 0;
-		unsigned int skipIndex = 0;
-		unsigned int growthRate = 0;
-		unsigned int enemyNumShips = 0;
-		std::vector<Planet*> attackable;
-
-		for (unsigned int i = 0, n = notMyPlanets.size(); i < n; i++)
+		if (f->Owner() == 1)
 		{
-			if (find(skip.begin(), skip.end(), i) != skip.end())
-				continue;
-
-			Planet* p = notMyPlanets[i];
-
-			tmpNumShips -= p->NumShips() + 1;
-			if (tmpNumShips < 0)
-			{
-				break;
-			}
-
-			growthRate += p->GrowthRate();
-			attackable.push_back(p);
-
-			enemyNumShips += p->NumShips();
-
-			if (highestNumShips < p->NumShips())
-			{
-				highestNumShips = p->NumShips();
-				skipIndex = i;
-			}
+			myFleets.push_back(f);
 		}
-
-		assert(enemyNumShips < numShips);
-
-		if (growthRate > bestGrowthRate)
+		else
 		{
-			bestGrowthRate = growthRate;
-			bestAttackable = attackable;
+			notMyFleets.push_back(f);
 		}
-
-		skip.push_back(skipIndex);
 	}
 
-	// (3) consume all the planets
-	for (unsigned int i = 0, n = bestAttackable.size(); i < n; i++)
+	// (3) attack weakest planets
+	for (unsigned int i = 0, n = notMyPlanets.size(); i < n; i++)
 	{
-		Planet* target = bestAttackable[i];
+		Planet* target = notMyPlanets[i];
 		const bool isNeutral = target->Owner() == 0;
-		
+
+		int targetNumShips = target->NumShips();
+
+		// subtract our incomming fleets
+		for (unsigned int j = 0, m = myFleets.size(); j < m; j++)
+		{
+			Fleet* f = myFleets[j];
+			if (f->DestinationPlanet() == target->PlanetID())
+				targetNumShips -= f->NumShips();
+		}
+
+		// add their incomming fleets
+		for (unsigned int j = 0, m = notMyFleets.size(); j < m; j++)
+		{
+			Fleet* f = notMyFleets[j];
+			if (f->DestinationPlanet() == target->PlanetID())
+				targetNumShips += f->NumShips();
+		}
+
+		// if this target will be ours, we don't need to attack it, skip target
+		if (targetNumShips < 0)
+		{
+			continue;
+		}
+
+		// if we don't have the amount of ships to deal with this, skip target
+		if ((numShips - targetNumShips) < 0)
+		{
+			continue;
+		}
+
+		// send fleets until we've captured the planet
 		for (unsigned int j = 0, m = myPlanets.size(); j < m; j++)
 		{
 			Planet* source = myPlanets[j];
@@ -130,8 +109,9 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 			const int distance = pw.Distance(source->PlanetID(), target->PlanetID());
 			const int targetGrowth = isNeutral ? 0 : distance*target->GrowthRate();
 
-			int fleetSize = std::min<int>(source->NumShips() - 1, target->NumShips() + targetGrowth + 1);
+			int fleetSize = std::min<int>(source->NumShips() - 1, targetNumShips + targetGrowth + 1);
 
+			numShips -= fleetSize;
 			pw.IssueOrder(source->PlanetID(), target->PlanetID(), fleetSize);
 			source->NumShips(source->NumShips() - fleetSize);
 			target->NumShips(target->NumShips() - fleetSize + targetGrowth);
@@ -141,15 +121,15 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 				break;
 		}
 	}
+
+	round++;
 }
 
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
   std::ofstream file;
-#ifdef DEBUG
   file.open("mybot.txt", std::ios::in|std::ios::trunc);
-#endif
   std::string current_line;
   std::string map_data;
   while (true) {

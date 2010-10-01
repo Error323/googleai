@@ -335,24 +335,36 @@ void PlanetWars::FinishTurn() const {
 }
 
 std::ostream& operator<<(std::ostream &out, const Planet& p) {
-	out << "Planet{id:";
-	out << p.PlanetID();
+	char data[10];
+	out << "\tPlanet{id:";
+	snprintf(data, 10, "%2.2d", p.PlanetID());
+	out << data;
 	out << ", owner:";
-	out << (p.Owner() == 1 ? "us" : "them");
+	if (p.Owner() == 0)
+		out << "N";
+	else
+	if (p.Owner() == 1)
+		out << "U";
+	else
+		out << "T";
 	out << ", numships:";
-	out << p.NumShips();
+	snprintf(data, 10, "%3.3d", p.NumShips());
+	out << data;
 	out << ", growthrate:";
-	out << p.GrowthRate();
+	snprintf(data, 10, "%1.1d", p.GrowthRate());
+	out << data;
 	out << "}";
 
 	return out;
 }
 
 std::ostream& operator<<(std::ostream& out, const Fleet& f) {
-	out << "Fleet{owner:";
-	out << (f.Owner() == 1 ? "us" : "them");
+	char data[10];
+	out << "\tFleet{owner:";
+	out << (f.Owner() == 1 ? "U" : "T");
 	out << ", numships:";
-	out << f.NumShips();
+	snprintf(data, 10, "%3.3d", f.NumShips());
+	out << data;
 	out << ", source:";
 	out << f.SourcePlanet();
 	out << ", dest:";
