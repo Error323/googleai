@@ -12,8 +12,6 @@
 #define LOG(msg)
 #endif
 
-unsigned int turnsLeft = 200;
-
 bool cmp(const Planet& a, const Planet& b) {
 	if (a.GrowthRate() == b.GrowthRate())
 		return a.NumShips() > b.NumShips();
@@ -22,8 +20,7 @@ bool cmp(const Planet& a, const Planet& b) {
 }
 
 void DoTurn(const PlanetWars& pw, std::ofstream& file) {
-	LOG("\n\tturn: " << turnsLeft);
-
+	// The overall idea is to maximize growth every turn
 	// (1) determine number of our ships
 	unsigned int numShips = 0;
 	std::vector<Planet> myPlanets, notMyPlanets;
@@ -41,6 +38,11 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 		{
 			notMyPlanets.push_back(p);
 		}
+	}
+
+	if (numShips < 1)
+	{
+		return;
 	}
 
 	// (2) determine best planets for attack
@@ -69,6 +71,7 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 			}
 
 			growthRate += p.GrowthRate();
+			assert(growthRate <= numShips);
 			attackable.push_back(p);
 
 			if (highestNumShips < p.NumShips())
@@ -87,10 +90,31 @@ void DoTurn(const PlanetWars& pw, std::ofstream& file) {
 		skip.push_back(skipIndex);
 	}
 
-	// (3) determine shortest routes for attackable planets
-	
+	// (3) greedily determine shortest routes for attackable planets
+	for (unsigned int i = 0, n = bestAttackable.size(); i < n; i++)
+	{
+		const Planet& target = bestAttackable[i];
+		Planet& bestSource = myPlanets[0];
+		int bestDistance = pw.Distance(bestSource.PlanetID(), target.PlanetID());
+		
+		for (unsigned int j = 1, m = myPlanets.size(); j < m; j++)
+		{
+			const Planet& source = myPlanets[j];
+			if (source.NumShips() <= 1)
+				continue;
 
-	turnsLeft--;
+			int distance = pw.Distance(source.PlanetID(), target.PlanetID());
+			if (distance < bestDistance)
+			{
+				bestDistance = distance;
+				bestSource = source;
+			}
+		}
+
+		int fleetSize = std::min<int>(bestSource.NumShips() - 1, target.NumShips() + 1);
+		bestSource.NumShips(bestSource.NumShips() - fleetSize);
+		pw.IssueOrder(bestSource.PlanetID(), target.PlanetID(), fleetSize);
+	}
 }
 
 // This is just the main game loop that takes care of communicating with the
