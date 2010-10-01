@@ -361,6 +361,7 @@ std::ostream& operator<<(std::ostream& out, const Fleet& f) {
 	out << f.TotalTripLength();
 	out << ", remaining:";
 	out << f.TurnsRemaining();
+	out << "}";
 
 	return out;
 }
