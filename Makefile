@@ -1,4 +1,4 @@
-CC=g++
+CC=g++ -O2
 
 all: MyBot
 

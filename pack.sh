@@ -16,6 +16,7 @@ export GIT_DIR="$(dirname $0)/.git"
 VERSION=`git describe --tags` || exit 1
 FILE="googleai-v${VERSION}.zip"
 
+make clean
 make -j 5 && zip "${FILE}" *.cc *.h || exit 1
 make clean
 mv "${FILE}" submits/
