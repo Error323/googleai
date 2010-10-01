@@ -6,7 +6,7 @@
 #include <limits>
 #include <cassert>
 
-#define VERSION "4.0"
+#define VERSION "4.1"
 
 #define LOG(msg)                  \
 	if (file.good())              \
@@ -139,7 +139,7 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 			target->NumShips(target->NumShips() - fleetSize + targetGrowth);
 
 			// This planet is ours, proceed to next target
-			if (target->NumShips() < 0)
+			if (target->NumShips() < -2)
 			{
 				break;
 			}
