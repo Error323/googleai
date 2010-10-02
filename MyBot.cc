@@ -6,7 +6,7 @@
 #include <limits>
 #include <cassert>
 
-#define VERSION "6.1"
+#define VERSION "6.2"
 
 #define LOG(msg)                  \
 	if (file.good())              \
@@ -38,6 +38,7 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 
 	// (1) determine number of our ships and divide planets
 	int myNumShips = 0, enemyNumShips = 0;
+	int myGrowthRate = 0, enemyGrowthRate = 0;
 
 	std::vector<Planet> planets = pw.Planets();
 	std::vector<Planet> myPlanets, neutralPlanets, enemyPlanets;
@@ -49,6 +50,7 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 		if (p.Owner() == 1)
 		{
 			myNumShips += p.NumShips() - 1; // one must stay behind
+			myGrowthRate += p.GrowthRate();
 			myPlanets.push_back(p);
 		}
 		else
@@ -59,6 +61,7 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 		else
 		{
 			enemyNumShips += p.NumShips() - 1; // one must stay behind
+			enemyGrowthRate += p.GrowthRate();
 			enemyPlanets.push_back(p);
 		}
 	}
@@ -87,7 +90,7 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 		Planet& target = neutralPlanets[i];
 
 		int numShipsRequired = target.NumShips();
-		int minimalDistance = std::numeric_limits<int>::max();
+		int myMinimalDistance = std::numeric_limits<int>::max();
 		bool owned = false;
 		for (unsigned int j = 0, m = notMyFleets.size(); j < m; j++)
 		{
@@ -107,21 +110,35 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 
 				if (owned)
 				{
-					minimalDistance = std::min<int>(minimalDistance, f.TurnsRemaining());
+					myMinimalDistance = std::min<int>(myMinimalDistance, f.TurnsRemaining());
 					numShipsRequired = abs(numShipsRequired);
 				}
 			}
 		}
 
+		for (unsigned int j = 0, m = myFleets.size(); j < m; j++)
+		{
+			Fleet& f = myFleets[j];
+			if (f.DestinationPlanet() == target.PlanetID())
+			{
+				numShipsRequired -= f.NumShips();
+			}
+		}
+
+		// Already on it
+		if (numShipsRequired < 0)
+		{
+			continue;
+		}
+
 		// If the enemy fleet isn't underway, neither will we
 		if (!owned)
 		{
-			LOG("No enemy fleets at " << target);
 			continue;
 		}
 
 		// if the required number is greater than we can handle, don't
-		if (numShipsRequired > myNumShips)
+		if ((numShipsRequired+myMinimalDistance*enemyGrowthRate) >= (myNumShips+myMinimalDistance*myGrowthRate))
 		{
 			LOG("Enemy fleets too big " << numShipsRequired);
 			continue;
@@ -131,28 +148,25 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 		target.NumShips(numShipsRequired);
 		sort(myPlanets.begin(), myPlanets.end(), cmp2);
 
-		LOG(target);
 		// send fleets until we've captured the planet
 		for (unsigned int j = 0, m = myPlanets.size(); j < m; j++)
 		{
 			Planet& source = myPlanets[j];
 			const int distance = pw.Distance(source.PlanetID(), target.PlanetID());
 
-			// if we don't have enough ships anymore, or minimalDistance isn't satisfied, skip
-			if (source.NumShips() <= 1 || distance <= minimalDistance)
+			// if we don't have enough ships anymore, or myMinimalDistance isn't satisfied, skip
+			if (source.NumShips() <= 1 || distance <= myMinimalDistance)
 			{
 				continue;
 			}
 
-			const int targetGrowth = (distance-minimalDistance)*target.GrowthRate();
+			const int targetGrowth = (distance-myMinimalDistance)*target.GrowthRate();
 			const int fleetSize = std::min<int>(source.NumShips() - 1, target.NumShips() + targetGrowth + 1);
 
 			myNumShips -= fleetSize;
 			pw.IssueOrder(source.PlanetID(), target.PlanetID(), fleetSize);
 			source.NumShips(source.NumShips() - fleetSize);
 			target.NumShips(target.NumShips() - fleetSize);
-
-			LOG("\t" << source << " | " << distance << " > " << minimalDistance);
 
 			// This planet is ours, proceed to next target
 			if (target.NumShips() < 0)
