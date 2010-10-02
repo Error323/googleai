@@ -1,4 +1,5 @@
 #include "PlanetWars.h"
+#include "Simulator.h"
 
 #include <iostream>
 #include <fstream>
@@ -8,35 +9,15 @@
 
 #define VERSION "6.2"
 
-#define LOG(msg)                  \
-	if (file.good())              \
-	{                             \
-		file << msg << std::endl; \
-	}
+void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
+	// (1) determine wether we are winning or not
+	Simulator sim(&pw);
+	sim.Start(200 - round, file);
+	// (2a) if we are winning become defensive
+	
+	// (2b) if we are losing or drawing become agressive
 
-unsigned int round = 0;
-
-PlanetWars* planetWars;
-
-Planet* globalTarget = NULL;
-
-bool cmp1(const Planet& a, const Planet& b) {
-	float valA = a.GrowthRate() / (a.NumShips() + 1.0f);
-	float valB = b.GrowthRate() / (b.NumShips() + 1.0f);
-	return valA > valB;
-}
-
-bool cmp2(const Planet& a, const Planet& b) {
-	int distA = planetWars->Distance(a.PlanetID(), globalTarget->PlanetID());
-	int distB = planetWars->Distance(b.PlanetID(), globalTarget->PlanetID());
-	return distA < distB;
-}
-
-void DoTurn(PlanetWars& pw, std::ofstream& file) {
-	LOG("\n"<<round);
-	planetWars = &pw;
-
-	// (1) determine number of our ships and divide planets
+	/*
 	int myNumShips = 0, enemyNumShips = 0;
 	int myGrowthRate = 0, enemyGrowthRate = 0;
 
@@ -250,35 +231,44 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 			}
 		}
 	}
-
-	round++;
+	*/
 }
 
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
-  std::ofstream file;
-  std::string filename("-Error323-v");
-  filename = argv[0] + filename + VERSION + ".txt";
-  file.open(filename.c_str(), std::ios::in|std::ios::trunc);
-  std::string current_line;
-  std::string map_data;
-  while (true) {
-    int c = std::cin.get();
-    current_line += (char)c;
-    if (c == '\n') {
-      if (current_line.length() >= 2 && current_line.substr(0, 2) == "go") {
-        PlanetWars pw(map_data);
-        map_data = "";
-        DoTurn(pw, file);
-	pw.FinishTurn();
-      } else {
-        map_data += current_line;
-      }
-      current_line = "";
-    }
-  }
-  if (file.good())
-	file.close();
-  return 0;
+	unsigned int round = 0;
+	std::ofstream file;
+	std::string filename("-Error323-v");
+	filename = argv[0] + filename + VERSION + ".txt";
+	file.open(filename.c_str(), std::ios::in|std::ios::trunc);
+	std::string current_line;
+	std::string map_data;
+	while (true) {
+		int c = std::cin.get();
+		current_line += (char)c;
+		if (c == '\n') 
+		{
+			if (current_line.length() >= 2 && current_line.substr(0, 2) == "go") 
+			{
+				PlanetWars pw(map_data);
+				map_data = "";
+				LOG("round: " << round);
+				DoTurn(pw, round, file);
+				LOG("\n--------------------------------------------------------------------------------\n");
+				round++;
+				pw.FinishTurn();
+			} 
+			else 
+			{
+				map_data += current_line;
+			}
+			current_line = "";
+		}
+	}
+	if (file.good())
+	{
+		file.close();
+	}
+	return 0;
 }
