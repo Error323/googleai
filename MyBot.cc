@@ -6,7 +6,7 @@
 #include <limits>
 #include <cassert>
 
-#define VERSION "6.0"
+#define VERSION "6.1"
 
 #define LOG(msg)                  \
 	if (file.good())              \
@@ -94,10 +94,8 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 			Fleet& f = notMyFleets[j];
 			if (f.DestinationPlanet() == target.PlanetID())
 			{
-
 				if (owned)
 				{
-					numShipsRequired = abs(numShipsRequired);
 					numShipsRequired += f.NumShips();
 				}
 				else
@@ -110,6 +108,7 @@ void DoTurn(PlanetWars& pw, std::ofstream& file) {
 				if (owned)
 				{
 					minimalDistance = std::min<int>(minimalDistance, f.TurnsRemaining());
+					numShipsRequired = abs(numShipsRequired);
 				}
 			}
 		}
