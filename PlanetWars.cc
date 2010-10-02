@@ -227,14 +227,11 @@ std::string PlanetWars::ToString() const {
   std::stringstream s;
   for (unsigned int i = 0; i < planets_.size(); ++i) {
     const Planet& p = planets_[i];
-    s << "P " << p.X() << " " << p.Y() << " " << p.Owner()
-      << " " << p.NumShips() << " " << p.GrowthRate() << std::endl;
+    s << p << std::endl;
   }
   for (unsigned int i = 0; i < fleets_.size(); ++i) {
     const Fleet& f = fleets_[i];
-    s << "F " << f.Owner() << " " << f.NumShips() << " "
-      << f.SourcePlanet() << " " << f.DestinationPlanet() << " "
-      << f.TotalTripLength() << " " << f.TurnsRemaining() << std::endl;
+    s << f << std::endl;
   }
   return s.str();
 }
