@@ -11,8 +11,9 @@
 
 void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	// (1) determine wether we are winning or not
+	LOG(pw.ToString());
 	Simulator sim(&pw);
-	sim.Start(200 - round, file);
+	sim.Start(2, file);
 	// (2a) if we are winning become defensive
 	
 	// (2b) if we are losing or drawing become agressive
