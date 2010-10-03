@@ -29,6 +29,8 @@ void Simulator::Start(unsigned int totalTurns, std::ofstream& file) {
 			break;
 		}
 
+		LOG("\t"<<f);
+
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
 
 		assert(turnsRemaining >= 0);

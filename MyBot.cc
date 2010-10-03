@@ -9,10 +9,13 @@
 
 #define VERSION "6.2"
 
+#define MAX_ROUNDS 200
+
 void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	// (1) determine wether we are winning or not
+	LOG(pw.ToString());
 	Simulator sim(&pw);
-	sim.Start(200-round, file);
+	sim.Start(MAX_ROUNDS - round, file);
 
 	// (2a) if we are winning become defensive
 	if (sim.Winning())
