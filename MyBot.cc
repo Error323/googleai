@@ -12,74 +12,65 @@
 
 #define MAX_ROUNDS 200
 
-bool SortOnPlanetAndTurnsRemaining(const Fleet& a, const Fleet& b) {
-	if (a.DestinationPlanet() == b.DestinationPlanet())
-		return a.TurnsRemaining() < b.TurnsRemaining();
-	else
-		return a.DestinationPlanet() < b.DestinationPlanet();
-}
-
 void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
-	// (1) determine wether we are winning or not
+	std::vector<Fleet>  orders;
 	std::vector<Fleet>  AF = pw.Fleets();
 	std::vector<Planet> AP = pw.Planets();
-	Simulator sim(file);
-	sim.Start(MAX_ROUNDS - round, AP, AF);
-	int mNumShips = sim.MyScore();
-	int eNumShips = sim.EnemyScore();
 
-	// (2a) if we are winning become defensive
-	if (sim.Winning())
+	int maxTurnsRemaining = 0;
+	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
+		Fleet& f = AF[i];
+		maxTurnsRemaining = std::max<int>(maxTurnsRemaining, f.TurnsRemaining());
 	}
 
-	// (2b) if we are losing or drawing become offensive
-	else
+	// (1) Simulate ahead such that all fleets are consumed
+	Simulator s(file);
+	s.Start(maxTurnsRemaining, AP, AF);
+	std::vector<Planet> MP = pw.MyPlanets();
+
+	// (2) Filter out those planets that used to be neutral and attack them
+	std::vector<Planet> simAP = s.Planets();
+	for (unsigned int i = 0, n = simAP.size(); i < n; i++)
 	{
-		std::vector<Planet> MP = pw.MyPlanets();
-		std::vector<Fleet>  EF = pw.EnemyFleets();
-		std::vector<Fleet>  MF = pw.MyFleets();
+		Planet& simTarget = simAP[i]; // planet with new properties
+		Planet& target    = AP[i];    // planet with current properties
 
-		// sort enemy fleets on planet and distance to target
-		sort(EF.begin(), EF.end(), SortOnPlanetAndTurnsRemaining);
-
-		std::vector<std::pair<int, int> > targets; // <planetid, fleetid>
-		// only look for neutral planets as enemy target
-		for (unsigned int i = 0, n = EF.size(); i < n; i++)
+		if (simTarget.Owner() > 1 && target.Owner() == 0)
 		{
-			Fleet& eFleet  = EF[i];
-			Planet& target = AP[eFleet.DestinationPlanet()];
-			if (target.Owner() == 0)
+			int timeOfOwnerShipChange = s.GetTimeOfOwnerShipChange(i);
+			for (unsigned int j = 0, m = MP.size(); j < m; j++)
 			{
-				targets.push_back(std::make_pair(target.PlanetID(), i));
+				Planet& source = MP[j];
+				const int distance = pw.Distance(source.PlanetID(), target.PlanetID());
+
+				// if we don't have enough ships anymore, skip
+				if (source.NumShips() <= 1)
+				{
+					continue;
+				}
+
+				const int targetGrowth = std::max<int>(0, distance-timeOfOwnerShipChange)*target.GrowthRate();
+				const int fleetSize = std::min<int>(source.NumShips() - 1, target.NumShips() + targetGrowth + 1);
+
+				orders.push_back(Fleet(1, fleetSize, source.PlanetID(), i, distance, distance));
+				source.NumShips(source.NumShips() - fleetSize);
+				target.NumShips(target.NumShips() - fleetSize);
+
+				// This planet is ours, proceed to next target
+				if (target.NumShips() < 0)
+				{
+					break;
+				}
+				
 			}
 		}
+	}
 
-		// conquer these planets
-		for (unsigned int i = 0, n = targets.size(); i < n; i++)
-		{
-			std::pair<int, int>& target = targets[i];
-			Fleet&  eFleet  = EF[target.second];
-			Planet& nPlanet = AP[target.first];
-
-			int enemies = eFleet.NumShips();
-			int minDist = eFleet.TurnsRemaining();
-
-			// look ahead for all enemyfleets with the same destination
-			while (i < n-1 && targets[i+1].first == target.first)
-			{
-				i++;
-				target   = targets[i];
-				eFleet   = EF[target.second];
-				nPlanet  = AP[target.first];
-				enemies += eFleet.NumShips();
-				minDist += eFleet.TurnsRemaining();
-			}
-
-			int maxDist = eFleet.TurnsRemaining();
-
-			
-		}
+	for (unsigned int i = 0, n = orders.size(); i < n; i++)
+	{
+		Fleet& order = orders[i];
+		pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
 	}
 
 	/*

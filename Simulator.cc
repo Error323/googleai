@@ -11,8 +11,8 @@ void Simulator::Start(unsigned int totalTurns,
 					std::vector<Planet>& planets, 
 					std::vector<Fleet>& fleets) {
 
-	std::vector<Planet> AP = planets;
-	std::vector<Fleet>  AF = fleets;
+	AP = planets;
+	AF = fleets;
 	myNumShips = enemyNumShips = 0;
 
 	sort(AF.begin(), AF.end(), SortOnTurnsLeft);
@@ -59,6 +59,10 @@ void Simulator::Start(unsigned int totalTurns,
 			if (p.NumShips() < f.NumShips())
 			{
 				p.Owner(f.Owner());
+				if (time.find(p.PlanetID()) == time.end())
+				{
+					time[p.PlanetID()] = turnsTaken;
+				}
 			}
 			p.NumShips(abs(p.NumShips() - f.NumShips()));
 		}
@@ -73,6 +77,10 @@ void Simulator::Start(unsigned int totalTurns,
 				if (p.NumShips() < f.NumShips())
 				{
 					p.Owner(f.Owner());
+					if (time.find(p.PlanetID()) == time.end())
+					{
+						time[p.PlanetID()] = turnsTaken;
+					}
 				}
 				p.NumShips(abs(p.NumShips() - f.NumShips()));
 			}
