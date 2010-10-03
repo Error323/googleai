@@ -12,6 +12,9 @@
 
 #define MAX_ROUNDS 200
 
+PlanetWars* globalPW     = NULL;
+int         globalTarget = 0;
+
 bool SortOnDestAndDist(const Fleet& a, const Fleet& b) {
 	if (a.DestinationPlanet() == b.DestinationPlanet())
 		return a.TurnsRemaining() > b.TurnsRemaining();
@@ -19,8 +22,14 @@ bool SortOnDestAndDist(const Fleet& a, const Fleet& b) {
 		return a.DestinationPlanet() < b.DestinationPlanet();
 }
 
+bool SortOnDistanceToTarget(const Planet& a, const Planet& b) {
+	int distA = globalPW->Distance(a.PlanetID(), globalTarget);
+	int distB = globalPW->Distance(b.PlanetID(), globalTarget);
+	return distA < distB;
+}
+
 void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
-	std::vector<Fleet>  orders;
+	globalPW = &pw;
 	std::vector<Fleet>  AF = pw.Fleets();
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Planet> MP = pw.MyPlanets();
@@ -44,7 +53,13 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 
 		if (simTarget.Owner() > 1 && nowTarget.Owner() <= 1)
 		{
+			std::vector<Fleet> orders;
+			bool successfullAttack = false;
 			int timeOfOwnerShipChange = s.GetTimeOfOwnerShipChange(f.DestinationPlanet());
+
+			// sort my planets on distance to current target
+			globalTarget = nowTarget.PlanetID();
+			sort(MP.begin(), MP.end(), SortOnDistanceToTarget);
 			for (unsigned int j = 0, m = MP.size(); j < m; j++)
 			{
 				Planet& source = MP[j];
@@ -56,27 +71,33 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 					continue;
 				}
 
-				const int targetGrowth = std::max<int>(0, distance-timeOfOwnerShipChange)*nowTarget.GrowthRate();
+				const int targetGrowth = std::max<int>(1, distance-timeOfOwnerShipChange)*nowTarget.GrowthRate();
 				const int fleetSize = std::min<int>(source.NumShips() - 1, simTarget.NumShips() + targetGrowth + 1);
 
 				orders.push_back(Fleet(1, fleetSize, source.PlanetID(), f.DestinationPlanet(), 0, 0));
 				source.NumShips(source.NumShips() - fleetSize);
-				nowTarget.NumShips(nowTarget.NumShips() - fleetSize);
+				simTarget.NumShips(simTarget.NumShips() - fleetSize);
 
 				// This planet is ours, proceed to next target
 				if (simTarget.NumShips() < 0)
 				{
+					successfullAttack = true;
 					break;
+				}
+			}
+
+			// only issue orders that definitly will conquer the target
+			if (successfullAttack)
+			{
+				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+				{
+					Fleet& order = orders[j];
+					pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
 				}
 			}
 		}
 	}
 	
-	for (unsigned int i = 0, n = orders.size(); i < n; i++)
-	{
-		Fleet& order = orders[i];
-		pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
-	}
 }
 
 
