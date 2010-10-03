@@ -3,6 +3,7 @@
 #include <vector>
 #include <algorithm>
 #include <fstream>
+#include <cassert>
 
 bool SortOnTurnsLeft(const Fleet& a, const Fleet& b) {
 	return a.TurnsRemaining() < b.TurnsRemaining();
@@ -30,11 +31,12 @@ void Simulator::Start(unsigned int totalTurns, std::ofstream& file) {
 
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
 
+		assert(turnsRemaining >= 0);
+
 		// Don't exceed max amount of simulation turns
 		if ((turnsRemaining+turnsTaken) > totalTurns)
 		{
 			turnsRemaining = totalTurns - turnsTaken;
-			turnsTaken = totalTurns;
 		}
 
 		// increase ships on all non-neutral planets
