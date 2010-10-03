@@ -1,23 +1,23 @@
 #include "Simulator.h"
 
-#include <vector>
 #include <algorithm>
 #include <fstream>
-#include <cassert>
 
 bool SortOnTurnsLeft(const Fleet& a, const Fleet& b) {
 	return a.TurnsRemaining() < b.TurnsRemaining();
 }
 
-void Simulator::Start(unsigned int totalTurns, std::ofstream& file) {
-	std::vector<Planet> AP = pw->Planets();
-	std::vector<Fleet>  AF = pw->Fleets();
+void Simulator::Start(unsigned int totalTurns, 
+					std::vector<Planet>& planets, 
+					std::vector<Fleet>& fleets) {
+
+	std::vector<Planet> AP = planets;
+	std::vector<Fleet>  AF = fleets;
+	myNumShips = enemyNumShips = 0;
 
 	sort(AF.begin(), AF.end(), SortOnTurnsLeft);
 
 	unsigned int turnsTaken    = 0;
-	unsigned int enemyNumShips = 0;
-	unsigned int myNumShips    = 0;
 	unsigned int i             = 0;
 	unsigned int n             = AF.size();
 	// Begin simulation
@@ -29,11 +29,7 @@ void Simulator::Start(unsigned int totalTurns, std::ofstream& file) {
 			break;
 		}
 
-		LOG("\t"<<f);
-
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
-
-		assert(turnsRemaining >= 0);
 
 		// Don't exceed max amount of simulation turns
 		if ((turnsRemaining+turnsTaken) > totalTurns)
@@ -120,7 +116,5 @@ void Simulator::Start(unsigned int totalTurns, std::ofstream& file) {
 			enemyNumShips += f.NumShips();
 		}
 	}
-
-	winning = myNumShips > enemyNumShips;
-	LOG("myNumShips: " << myNumShips << "\tenemyNumShips: " << enemyNumShips << "\twinning: " << winning);
+	LOG("myNumShips: " << myNumShips << "\tenemyNumShips: " << enemyNumShips << "\twinning: " << Winning());
 }

@@ -3,6 +3,8 @@
 
 #include "PlanetWars.h"
 
+#include <vector>
+
 #define LOG(msg)                  \
 	if (file.good())              \
 	{                             \
@@ -11,18 +13,22 @@
 
 class Simulator {
 public:
-	Simulator(PlanetWars* pw_):
-		pw(pw_),
-		winning(false)
+	Simulator(std::ofstream& filestream):
+		myNumShips(0),
+		enemyNumShips(0),
+		file(filestream)
 	{
 	}
 
-	void Start(unsigned int, std::ofstream&);
-	bool Winning() { return winning; }
+	void Start(unsigned int, std::vector<Planet>&, std::vector<Fleet>&);
+	bool Winning()    { return myNumShips > enemyNumShips; }
+	int MyScore()     { return myNumShips; }
+	int EnemyScore()  { return enemyNumShips; }
 
 private:
-	bool        winning;
-	PlanetWars* pw;
+	int myNumShips;
+	int enemyNumShips;
+	std::ofstream& file;
 };
 
 #endif

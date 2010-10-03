@@ -6,74 +6,83 @@
 #include <algorithm>
 #include <limits>
 #include <cassert>
+#include <utility>
 
-#define VERSION "6.2"
+#define VERSION "7.0"
 
 #define MAX_ROUNDS 200
 
+bool SortOnPlanetAndTurnsRemaining(const Fleet& a, const Fleet& b) {
+	if (a.DestinationPlanet() == b.DestinationPlanet())
+		return a.TurnsRemaining() < b.TurnsRemaining();
+	else
+		return a.DestinationPlanet() < b.DestinationPlanet();
+}
+
 void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	// (1) determine wether we are winning or not
-	LOG(pw.ToString());
-	Simulator sim(&pw);
-	sim.Start(MAX_ROUNDS - round, file);
+	std::vector<Fleet>  AF = pw.Fleets();
+	std::vector<Planet> AP = pw.Planets();
+	Simulator sim(file);
+	sim.Start(MAX_ROUNDS - round, AP, AF);
+	int mNumShips = sim.MyScore();
+	int eNumShips = sim.EnemyScore();
 
 	// (2a) if we are winning become defensive
 	if (sim.Winning())
 	{
 	}
 
-	// (2b) if we are losing or drawing become agressive
+	// (2b) if we are losing or drawing become offensive
 	else
 	{
+		std::vector<Planet> MP = pw.MyPlanets();
+		std::vector<Fleet>  EF = pw.EnemyFleets();
+		std::vector<Fleet>  MF = pw.MyFleets();
+
+		// sort enemy fleets on planet and distance to target
+		sort(EF.begin(), EF.end(), SortOnPlanetAndTurnsRemaining);
+
+		std::vector<std::pair<int, int> > targets; // <planetid, fleetid>
+		// only look for neutral planets as enemy target
+		for (unsigned int i = 0, n = EF.size(); i < n; i++)
+		{
+			Fleet& eFleet  = EF[i];
+			Planet& target = AP[eFleet.DestinationPlanet()];
+			if (target.Owner() == 0)
+			{
+				targets.push_back(std::make_pair(target.PlanetID(), i));
+			}
+		}
+
+		// conquer these planets
+		for (unsigned int i = 0, n = targets.size(); i < n; i++)
+		{
+			std::pair<int, int>& target = targets[i];
+			Fleet&  eFleet  = EF[target.second];
+			Planet& nPlanet = AP[target.first];
+
+			int enemies = eFleet.NumShips();
+			int minDist = eFleet.TurnsRemaining();
+
+			// look ahead for all enemyfleets with the same destination
+			while (i < n-1 && targets[i+1].first == target.first)
+			{
+				i++;
+				target   = targets[i];
+				eFleet   = EF[target.second];
+				nPlanet  = AP[target.first];
+				enemies += eFleet.NumShips();
+				minDist += eFleet.TurnsRemaining();
+			}
+
+			int maxDist = eFleet.TurnsRemaining();
+
+			
+		}
 	}
 
 	/*
-	int myNumShips = 0, enemyNumShips = 0;
-	int myGrowthRate = 0, enemyGrowthRate = 0;
-
-	std::vector<Planet> planets = pw.Planets();
-	std::vector<Planet> myPlanets, neutralPlanets, enemyPlanets;
-	sort(planets.begin(), planets.end(), cmp1);
-	for (unsigned int i = 0, n = planets.size(); i < n; i++)
-	{
-		Planet& p = planets[i];
-
-		if (p.Owner() == 1)
-		{
-			myNumShips += p.NumShips() - 1; // one must stay behind
-			myGrowthRate += p.GrowthRate();
-			myPlanets.push_back(p);
-		}
-		else
-		if (p.Owner() == 0)
-		{
-			neutralPlanets.push_back(p);
-		}
-		else
-		{
-			enemyNumShips += p.NumShips() - 1; // one must stay behind
-			enemyGrowthRate += p.GrowthRate();
-			enemyPlanets.push_back(p);
-		}
-	}
-
-	// (2) divide fleets
-	std::vector<Fleet> fleets = pw.Fleets();
-	std::vector<Fleet> myFleets, notMyFleets;
-	for (unsigned int i = 0, n = fleets.size(); i < n; i++)
-	{
-		Fleet& f = fleets[i];
-
-		if (f.Owner() == 1)
-		{
-			myFleets.push_back(f);
-		}
-		else
-		{
-			notMyFleets.push_back(f);
-		}
-	}
-
 	// (3) engage neutral planets as soon as an enemyfleet is underway and is
 	// closer, this allows us to use less fleets
 	for (unsigned int i = 0, n = neutralPlanets.size(); i < n; i++)
