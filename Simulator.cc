@@ -58,11 +58,7 @@ void Simulator::Start(unsigned int totalTurns,
 		{
 			if (p.NumShips() < f.NumShips())
 			{
-				p.Owner(f.Owner());
-				if (time.find(p.PlanetID()) == time.end())
-				{
-					time[p.PlanetID()] = turnsTaken;
-				}
+				ChangeOwner(p, f, turnsTaken);
 			}
 			p.NumShips(abs(p.NumShips() - f.NumShips()));
 		}
@@ -76,11 +72,7 @@ void Simulator::Start(unsigned int totalTurns,
 			{
 				if (p.NumShips() < f.NumShips())
 				{
-					p.Owner(f.Owner());
-					if (time.find(p.PlanetID()) == time.end())
-					{
-						time[p.PlanetID()] = turnsTaken;
-					}
+					ChangeOwner(p, f, turnsTaken);
 				}
 				p.NumShips(abs(p.NumShips() - f.NumShips()));
 			}
@@ -125,4 +117,24 @@ void Simulator::Start(unsigned int totalTurns,
 		}
 	}
 	LOG("myNumShips: " << myNumShips << "\tenemyNumShips: " << enemyNumShips << "\twinning: " << Winning());
+}
+
+std::vector<std::pair<int,int> >& Simulator::GetOwnershipHistory(int i) { 
+	if (ownershipHistory.find(i) == ownershipHistory.end())
+	{
+		ownershipHistory[i] = std::vector<std::pair<int, int> >();
+	}
+
+	return ownershipHistory[i]; 
+}
+
+void Simulator::ChangeOwner(Planet& p, Fleet& f, int time) {
+	if (ownershipHistory.find(p.PlanetID()) == ownershipHistory.end())
+	{
+		ownershipHistory[p.PlanetID()] = std::vector<std::pair<int, int> >();
+		ownershipHistory[p.PlanetID()].push_back(std::make_pair(p.Owner(), 0));
+	}
+	ownershipHistory[p.PlanetID()].push_back(std::make_pair(f.Owner(), time));
+
+	p.Owner(f.Owner());
 }

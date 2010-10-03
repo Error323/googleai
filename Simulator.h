@@ -5,6 +5,7 @@
 
 #include <vector>
 #include <map>
+#include <utility>
 
 #define LOG(msg)                  \
 	if (file.good())              \
@@ -27,8 +28,8 @@ public:
 	int EnemyScore()  { return enemyNumShips; }
 	std::vector<Planet>& Planets() { return AP; }
 	std::vector<Fleet>&  Fleets()  { return AF; }
-	int GetTimeOfOwnerShipChange(int i) { return time.find(i) == time.end() ? 0 : time[i]; }
 	Planet& GetPlanet(int i) { return AP[i]; }
+	std::vector<std::pair<int,int> >& GetOwnershipHistory(int i);
 
 private:
 	int myNumShips;
@@ -36,7 +37,9 @@ private:
 	std::ofstream& file;
 	std::vector<Planet> AP;
 	std::vector<Fleet>  AF;
-	std::map<int, int>  time; ///< time of _first_ planet ownership change <planetid,time>
+	// <planet, vec<owner, time> >
+	std::map<int, std::vector<std::pair<int, int> > > ownershipHistory;
+	void ChangeOwner(Planet& p, Fleet& f, int time);
 };
 
 #endif

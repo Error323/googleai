@@ -55,7 +55,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		{
 			std::vector<Fleet> orders;
 			bool successfullAttack = false;
-			int timeOfOwnerShipChange = s.GetTimeOfOwnerShipChange(f.DestinationPlanet());
+			std::vector<std::pair<int,int> >& ownershipHistory = s.GetOwnershipHistory(f.DestinationPlanet());
 
 			// sort my planets on distance to current target
 			globalTarget = nowTarget.PlanetID();
@@ -71,8 +71,12 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 					continue;
 				}
 
-				const int targetGrowth = std::max<int>(1, distance-timeOfOwnerShipChange)*nowTarget.GrowthRate();
-				const int fleetSize = std::min<int>(source.NumShips() - 1, simTarget.NumShips() + targetGrowth + 1);
+				const int time = std::max<int>(1, distance-ownershipHistory[1].second);
+				const int targetGrowth = time*nowTarget.GrowthRate();
+
+				const int ourFleet = source.NumShips() - 1;
+				const int requiredFleet = simTarget.NumShips() + targetGrowth + 1;
+				const int fleetSize = std::min<int>(ourFleet, requiredFleet);
 
 				orders.push_back(Fleet(1, fleetSize, source.PlanetID(), f.DestinationPlanet(), 0, 0));
 				source.NumShips(source.NumShips() - fleetSize);
