@@ -65,16 +65,15 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 	return distA < distB;
 }
 
-#define EPS 0.1
 bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	const Planet& a = globalPW->GetPlanet(pidA);
 	const Planet& b = globalPW->GetPlanet(pidB);
 	const double mDistA = sqrt(pow(a.X() - globalMP->x, 2.0) + pow(a.Y() - globalMP->y, 2.0));
 	const double mDistB = sqrt(pow(b.X() - globalMP->x, 2.0) + pow(b.Y() - globalMP->y, 2.0));
-	const double eDistA = sqrt(pow(a.X() - globalEP->x, 2.0) + pow(a.Y() - globalEP->y, 2.0));
-	const double eDistB = sqrt(pow(b.X() - globalEP->x, 2.0) + pow(b.Y() - globalEP->y, 2.0));
 	double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
 	double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
+
+	static const double EPS = 0.1;
 
 	if (abs(mDistA - mDistB) < EPS)
 		return growA > growB;
@@ -173,6 +172,12 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 					continue;
 				}
 
+				// if this planet has more value and is about to be captured, don't use it
+				if (source.GrowthRate() >= target.GrowthRate() && !s.IsMyPlanet(sid))
+				{
+					continue;
+				}
+
 				const int distance = pw.Distance(tid, sid);
 				s1.Start(f.TurnsRemaining(), AP, AF);
 				if (s1.IsMyPlanet(tid))
@@ -263,6 +268,12 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 					continue;
 				}
 
+				// if this planet has more value and is about to be captured, don't use it
+				if (source.GrowthRate() >= curTarget.GrowthRate() && !s.IsMyPlanet(sid))
+				{
+					continue;
+				}
+
 				s1.Start(distance, AP, AF);
 				int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
 
@@ -298,7 +309,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	}
 
 	// (3) capture good planets during first round
-	if (round <= 0 || myNumShips > enemyNumShips*3)
+	if (round == 1 || myNumShips > enemyNumShips*2)
 	{
 		sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
 		for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
@@ -327,6 +338,12 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 
 				// if we don't have enough ships anymore
 				if (source.NumShips() <= 1)
+				{
+					continue;
+				}
+
+				// if this planet has more value and is about to be captured, don't use it
+				if (source.GrowthRate() >= curTarget.GrowthRate() && !s.IsMyPlanet(sid))
 				{
 					continue;
 				}
