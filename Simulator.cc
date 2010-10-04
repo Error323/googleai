@@ -14,6 +14,7 @@ void Simulator::Start(unsigned int totalTurns,
 	AP = planets;
 	AF = fleets;
 	myNumShips = enemyNumShips = 0;
+	ownershipHistory.clear();
 
 	sort(AF.begin(), AF.end(), SortOnTurnsLeft);
 
@@ -36,6 +37,8 @@ void Simulator::Start(unsigned int totalTurns,
 		{
 			turnsRemaining = totalTurns - turnsTaken;
 		}
+
+		turnsTaken += turnsRemaining;
 
 		// increase ships on all non-neutral planets
 		if (turnsRemaining > 0)
@@ -77,8 +80,6 @@ void Simulator::Start(unsigned int totalTurns,
 				p.NumShips(abs(p.NumShips() - f.NumShips()));
 			}
 		}
-
-		turnsTaken += turnsRemaining;
 	}
 
 	int turnsRemaining = totalTurns - turnsTaken;
@@ -116,7 +117,6 @@ void Simulator::Start(unsigned int totalTurns,
 			enemyNumShips += f.NumShips();
 		}
 	}
-	LOG("myNumShips: " << myNumShips << "\tenemyNumShips: " << enemyNumShips << "\twinning: " << Winning());
 }
 
 std::vector<std::pair<int,int> >& Simulator::GetOwnershipHistory(int i) { 

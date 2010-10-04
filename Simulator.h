@@ -23,13 +23,15 @@ public:
 	}
 
 	void Start(unsigned int, std::vector<Planet>&, std::vector<Fleet>&);
-	bool Winning()    { return myNumShips > enemyNumShips; }
-	int MyScore()     { return myNumShips; }
-	int EnemyScore()  { return enemyNumShips; }
-	std::vector<Planet>& Planets() { return AP; }
-	std::vector<Fleet>&  Fleets()  { return AF; }
-	Planet& GetPlanet(int i) { return AP[i]; }
 	std::vector<std::pair<int,int> >& GetOwnershipHistory(int i);
+
+	bool Winning()					{ return myNumShips > enemyNumShips; }
+	bool CapturedPlanet(int i) 		{ return AP[i].Owner() == 1; }
+	int MyScore()					{ return myNumShips; }
+	int EnemyScore()				{ return enemyNumShips; }
+	std::vector<Planet>& Planets()	{ return AP; }
+	std::vector<Fleet>&  Fleets()	{ return AF; }
+	Planet& GetPlanet(int i)		{ return AP[i]; }
 
 private:
 	int myNumShips;
