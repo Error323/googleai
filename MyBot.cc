@@ -70,8 +70,8 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	const Planet& b = globalPW->GetPlanet(pidB);
 	const double mDistA = sqrt(pow(a.X() - globalMP->x, 2.0) + pow(a.Y() - globalMP->y, 2.0));
 	const double mDistB = sqrt(pow(b.X() - globalMP->x, 2.0) + pow(b.Y() - globalMP->y, 2.0));
-	double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
-	double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
+	double growA = a.GrowthRate() / (0.5*a.NumShips() + 1.0);
+	double growB = b.GrowthRate() / (0.5*b.NumShips() + 1.0);
 
 	static const double EPS = 0.1;
 
