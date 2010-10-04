@@ -26,7 +26,7 @@ public:
 	std::vector<std::pair<int,int> >& GetOwnershipHistory(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
-	bool CapturedPlanet(int i) 		{ return AP[i].Owner() == 1; }
+	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
 	int MyScore()					{ return myNumShips; }
 	int EnemyScore()				{ return enemyNumShips; }
 	std::vector<Planet>& Planets()	{ return AP; }
