@@ -42,7 +42,7 @@ private:
 	std::vector<Fleet>  AF;
 	// <planet, vec<owner, time> >
 	std::map<int, std::vector<std::pair<int, int> > > ownershipHistory;
-	void ChangeOwner(Planet& p, Fleet& f, int time);
+	void ChangeOwner(Planet& p, int owner, int time);
 };
 
 #endif

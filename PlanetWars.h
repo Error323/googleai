@@ -59,6 +59,9 @@ class Fleet {
   // this value is 1, then the fleet will hit the destination planet next turn.
   int TurnsRemaining() const;
 
+  // Set a new value for turns remaining
+  int TurnsRemaining(int new_turns_remaining);
+
   friend std::ostream& operator<<(std::ostream&, const Fleet&);
 
  private:

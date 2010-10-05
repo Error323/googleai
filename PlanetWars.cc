@@ -63,6 +63,10 @@ int Fleet::TurnsRemaining() const {
   return turns_remaining_;
 }
 
+int Fleet::TurnsRemaining(int new_turns_remaining) {
+  return turns_remaining_ = new_turns_remaining;
+}
+
 Planet::Planet(int planet_id,
                int owner,
                int num_ships,

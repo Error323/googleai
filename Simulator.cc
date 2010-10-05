@@ -2,96 +2,133 @@
 
 #include <algorithm>
 #include <fstream>
+#include <cassert>
 
-bool SortOnTurnsLeft(const Fleet& a, const Fleet& b) {
-	return a.TurnsRemaining() < b.TurnsRemaining();
+bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
+	if (a.DestinationPlanet() == b.DestinationPlanet())
+		return a.TurnsRemaining() < b.TurnsRemaining();
+	else
+		return a.DestinationPlanet() < b.DestinationPlanet();
 }
 
 void Simulator::Start(unsigned int totalTurns, 
 					std::vector<Planet>& planets, 
 					std::vector<Fleet>& fleets) {
 
-	//copy_backward(planets.begin(), planets.end(), AP.begin());
-	//copy_backward(fleets.begin(), fleets.end(), AF.begin());
 	AP = planets;
 	AF = fleets;
 	myNumShips = enemyNumShips = 0;
 	ownershipHistory.clear();
+	std::vector<int> skipPlanets;
 
-	sort(AF.begin(), AF.end(), SortOnTurnsLeft);
+	sort(AF.begin(), AF.end(), SortOnPlanetAndTurnsLeft);
 
-	unsigned int turnsTaken    = 0;
-	unsigned int i             = 0;
-	unsigned int n             = AF.size();
 	// Begin simulation
-	for (; i < n; i++)
+	int turnsTaken = 0;
+	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
-		if (f.TurnsRemaining() > totalTurns)
-		{
-			break;
-		}
 
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
-
-		// Don't exceed max amount of simulation turns
-		if ((turnsRemaining+turnsTaken) > totalTurns)
+		if (turnsTaken + turnsRemaining > totalTurns)
 		{
 			turnsRemaining = totalTurns - turnsTaken;
 		}
-
 		turnsTaken += turnsRemaining;
 
-		// increase ships on all non-neutral planets
-		if (turnsRemaining > 0)
+		std::map<int, int> forces;
+		forces[f.Owner()] = f.NumShips();
+		std::vector<int> fleetsWithSameDestAndTurns;
+		fleetsWithSameDestAndTurns.push_back(i);
+
+		// if the next fleet has the same destination planet AND the same
+		// amount of turns remaining, gather all the forces
+		while (
+			i < n-1 && 
+			AF[i+1].DestinationPlanet() == f.DestinationPlanet() &&
+			AF[i+1].TurnsRemaining() == f.TurnsRemaining()
+		)
 		{
-			for (unsigned int j = 0, m = AP.size(); j < m; j++)
+			i++;
+			fleetsWithSameDestAndTurns.push_back(i);
+			if (forces.find(AF[i].Owner()) == forces.end())
 			{
-				Planet& p = AP[j];
-				if (p.Owner() != 0)
-				{
-					p.AddShips(p.GrowthRate()*turnsRemaining);
-				}
+				forces[AF[i].Owner()] = 0;
 			}
+			forces[AF[i].Owner()] += AF[i].NumShips();
+		}
+		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
+		{
+			Fleet& ff = AF[fleetsWithSameDestAndTurns[j]];
+			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
+		}
+		
+		// Add ship growth for non-neutral planets
+		Planet& p = AP[f.DestinationPlanet()];
+		if (p.Owner() > 0)
+		{
+			p.AddShips(turnsRemaining*p.GrowthRate());
 		}
 
-		// See if a planet gets a new owner
-		// and add additional ships
-		Planet& p = AP[f.DestinationPlanet()];
-
-		if (p.Owner() == 0)
+		// If there are more then one force and if all forces are the same
+		// size, the winner is the original planet owner and the new
+		// shipcount is zero
+		int forceBegin = forces.begin()->second;
+		int forceEnd   = (--forces.end())->second;
+		if (forces.size() > 1 && forceBegin >= p.NumShips() && forceBegin == forceEnd)
 		{
-			if (p.NumShips() < f.NumShips())
-			{
-				ChangeOwner(p, f, turnsTaken);
-			}
-			p.NumShips(abs(p.NumShips() - f.NumShips()));
+			p.NumShips(0);
 		}
 		else
 		{
-			if (p.Owner() == f.Owner())
+			// Determine biggest force
+			int owner = p.Owner();
+			int force = p.NumShips();
+			for (std::map<int,int>::iterator j = forces.begin(); j != forces.end(); j++)
 			{
-				p.NumShips(p.NumShips() + f.NumShips());
+				if (j->second >= force)
+				{
+					owner = j->first;
+					force = j->second;
+				}
+			}
+
+			// Change the planet owner to the biggest force and add it
+			if (p.Owner() == owner)
+			{
+				p.AddShips(force);
 			}
 			else
 			{
-				if (p.NumShips() < f.NumShips())
+				if (force > p.NumShips())
 				{
-					ChangeOwner(p, f, turnsTaken);
+					ChangeOwner(p, owner, turnsTaken);
 				}
-				p.NumShips(abs(p.NumShips() - f.NumShips()));
+				p.NumShips(abs(p.NumShips() - force));
 			}
 		}
+
+		// This planet has no more fleets, add additional simulation growth and
+		// reset turns taken
+		if (i == n-1 || AF[i+1].DestinationPlanet() != f.DestinationPlanet())
+		{
+			if (turnsTaken < totalTurns)
+			{
+				p.AddShips((totalTurns-turnsTaken)*p.GrowthRate());
+			}
+			turnsTaken = 0;
+		}
+		skipPlanets.push_back(p.PlanetID());
 	}
 
-	int turnsRemaining = totalTurns - turnsTaken;
-	for (unsigned int j = 0, m = AP.size(); j < m; j++)
+	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
-		Planet& p = AP[j];
-		if (p.Owner() != 0)
+		Planet& p = AP[i];
+		if (p.Owner() != 0 && find(skipPlanets.begin(), skipPlanets.end(), p.PlanetID()) == skipPlanets.end())
 		{
-			p.AddShips(p.GrowthRate()*turnsRemaining);
+			p.AddShips(p.GrowthRate()*totalTurns);
 		}
+
 		if (p.Owner() == 1)
 		{
 			myNumShips += p.NumShips();
@@ -102,10 +139,12 @@ void Simulator::Start(unsigned int totalTurns,
 		}
 	}
 
-	for (; i < n; i++)
+	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
-		if (f.TurnsRemaining() <= totalTurns)
+
+		// Fleet landed on planet...
+		if (f.TurnsRemaining() <= 0)
 		{
 			continue;
 		}
@@ -114,7 +153,7 @@ void Simulator::Start(unsigned int totalTurns,
 		{
 			myNumShips += f.NumShips();
 		}
-		else if (f.Owner() > 1)
+		else
 		{
 			enemyNumShips += f.NumShips();
 		}
@@ -130,13 +169,13 @@ std::vector<std::pair<int,int> >& Simulator::GetOwnershipHistory(int i) {
 	return ownershipHistory[i]; 
 }
 
-void Simulator::ChangeOwner(Planet& p, Fleet& f, int time) {
+void Simulator::ChangeOwner(Planet& p, int owner, int time) {
 	if (ownershipHistory.find(p.PlanetID()) == ownershipHistory.end())
 	{
 		ownershipHistory[p.PlanetID()] = std::vector<std::pair<int, int> >();
 		ownershipHistory[p.PlanetID()].push_back(std::make_pair(p.Owner(), 0));
 	}
-	ownershipHistory[p.PlanetID()].push_back(std::make_pair(f.Owner(), time));
+	ownershipHistory[p.PlanetID()].push_back(std::make_pair(owner, time));
 
-	p.Owner(f.Owner());
+	p.Owner(owner);
 }
