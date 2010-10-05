@@ -26,6 +26,16 @@ struct Point {
 		y /= s;
 		return *this;
 	}
+
+	double Distance(const Point& p)
+	{
+		return sqrt((x-p.x)*(x-p.x) + (y-p.y)*(y-p.y));
+	}
+
+	double Distance()
+	{
+		return sqrt(x*x + y*y);
+	}
 };
 
 
@@ -70,12 +80,20 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	const Planet& b = globalPW->GetPlanet(pidB);
 	const double mDistA = sqrt(pow(a.X() - globalMP->x, 2.0) + pow(a.Y() - globalMP->y, 2.0));
 	const double mDistB = sqrt(pow(b.X() - globalMP->x, 2.0) + pow(b.Y() - globalMP->y, 2.0));
-	double growA = a.GrowthRate() / (0.5*a.NumShips() + 1.0);
-	double growB = b.GrowthRate() / (0.5*b.NumShips() + 1.0);
+	const double eDistA = sqrt(pow(a.X() - globalEP->x, 2.0) + pow(a.Y() - globalEP->y, 2.0));
+	const double eDistB = sqrt(pow(b.X() - globalEP->x, 2.0) + pow(b.Y() - globalEP->y, 2.0));
+	const double distA = mDistA-eDistA;
+	const double distB = mDistB-eDistB;
+	
+	double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
+	double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
 
 	static const double EPS = 0.1;
 
-	if (abs(mDistA - mDistB) < EPS)
+	if (distA < distB)
+		return growA > growB;
+	else
+	if (abs(mDistA-mDistB) < EPS)
 		return growA > growB;
 	else
 		return mDistA < mDistB;
@@ -93,6 +111,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	int enemyNumShips = 0;
 	Point mP(0.0, 0.0); globalMP = &mP;
 	Point eP(0.0, 0.0); globalEP = &eP;
+	Point nP(0.0, 0.0);
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
@@ -101,6 +120,8 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			case 0: {
 				NPIDX.push_back(i);
 				NMPIDX.push_back(i); 
+				nP.x += p.X();
+				nP.y += p.Y();
 			} break;
 
 			case 1: {
@@ -119,7 +140,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			} break;
 		}
 	}
-	mP /= MPIDX.size(); eP /= EPIDX.size();
+	mP /= MPIDX.size(); eP /= EPIDX.size(); nP /= NPIDX.size();
 
 	std::vector<Fleet>  AF = pw.Fleets();
 	std::vector<int>    EFIDX;
@@ -139,9 +160,86 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		}
 	}
 
-
+	static const double D = mP.Distance(eP);
+	static const int    R = D > (nP.Distance()/2.0) ? 0 : 1;
 	Simulator s(file);
 	s.Start(MAX_ROUNDS-round, AP, AF);
+
+	// (0) capture good planets during first round or when we are epic
+	if (round <= 1 || myNumShips > enemyNumShips*2)
+	{
+		sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
+		for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
+		{
+			Planet& curTarget = AP[NMPIDX[i]];
+			const int tid = curTarget.PlanetID();
+			if (s.IsMyPlanet(tid) || (curTarget.Owner() == 0 && s.IsEnemyPlanet(tid)))
+			{
+				continue;
+			}
+
+			std::vector<Fleet>  orders;
+			std::vector<Planet> backupAP(AP);
+			std::vector<Fleet>  backupAF(AF);
+			
+			globalTarget = tid;
+			Simulator s1(file);
+			bool successfullAttack = false;
+
+			sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
+			for (unsigned int j = 0, m = MPIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[MPIDX[j]];
+				const int sid = source.PlanetID();
+				const int distance = pw.Distance(tid, sid);
+
+				// if we don't have enough ships anymore
+				if (source.NumShips() <= 1)
+				{
+					continue;
+				}
+
+				// if this planet has more value and is about to be captured, don't use it
+				if (source.GrowthRate() >= curTarget.GrowthRate() && s.IsEnemyPlanet(sid))
+				{
+					continue;
+				}
+
+				s1.Start(distance, AP, AF);
+				int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
+
+				const int fleetSize = std::min<int>(source.NumShips() - 1, fleetsRequired);
+
+				Fleet order(1, fleetSize, sid, tid, distance, distance);
+				orders.push_back(order);
+				AF.push_back(order);
+				source.NumShips(source.NumShips() - fleetSize);
+
+				// See if given all previous orders, this planet will be ours
+				s1.Start(MAX_ROUNDS-round, AP, AF);
+				if (s1.IsMyPlanet(tid))
+				{
+					successfullAttack = true;
+					break;
+				}
+			}
+			if (successfullAttack)
+			{
+				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+				{
+					Fleet& order = orders[j];
+					pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
+				}
+			}
+			else
+			{
+				AP = backupAP;
+				AF = backupAF;
+				//copy_backward(backupAP.begin(), backupAP.end(), AP.begin());
+				//copy_backward(backupAF.begin(), backupAF.end(), AF.begin());
+			}
+		}
+	}
 
 	// (1) defend our planets
 	sort(EFIDX.begin(), EFIDX.end(), SortOnGrowthRateAndTurnsRemainingAndPlanet);
@@ -151,7 +249,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		const int tid  = f.DestinationPlanet();
 		Planet& target = AP[f.DestinationPlanet()];
 
-		if (target.Owner() == 1 && !s.IsMyPlanet(tid))
+		if (target.Owner() == 1 && s.IsEnemyPlanet(tid))
 		{
 			std::vector<Fleet>  orders;
 			std::vector<Planet> backupAP(AP);
@@ -173,7 +271,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 				}
 
 				// if this planet has more value and is about to be captured, don't use it
-				if (source.GrowthRate() >= target.GrowthRate() && !s.IsMyPlanet(sid))
+				if (source.GrowthRate() >= target.GrowthRate() && s.IsEnemyPlanet(sid))
 				{
 					continue;
 				}
@@ -215,6 +313,8 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			{
 				AP = backupAP;
 				AF = backupAF;
+				//copy_backward(backupAP.begin(), backupAP.end(), AP.begin());
+				//copy_backward(backupAF.begin(), backupAF.end(), AF.begin());
 			}
 		}
 	}
@@ -233,7 +333,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		}
 
 		// This neutral planet will be captured by the enemy
-		if (s.GetPlanet(tid).Owner() > 1)
+		if (s.IsEnemyPlanet(tid))
 		{
 			std::vector<std::pair<int,int> >& history = s.GetOwnershipHistory(tid);
 
@@ -268,12 +368,6 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 					continue;
 				}
 
-				// if this planet has more value and is about to be captured, don't use it
-				if (source.GrowthRate() >= curTarget.GrowthRate() && !s.IsMyPlanet(sid))
-				{
-					continue;
-				}
-
 				s1.Start(distance, AP, AF);
 				int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
 
@@ -304,80 +398,8 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			{
 				AP = backupAP;
 				AF = backupAF;
-			}
-		}
-	}
-
-	// (3) capture good planets during first round
-	if (round == 1 || myNumShips > enemyNumShips*2)
-	{
-		sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
-		for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
-		{
-			Planet& curTarget = AP[NMPIDX[i]];
-			const int tid = curTarget.PlanetID();
-			if (s.IsMyPlanet(tid))
-			{
-				continue;
-			}
-
-			std::vector<Fleet>  orders;
-			std::vector<Planet> backupAP(AP);
-			std::vector<Fleet>  backupAF(AF);
-			
-			globalTarget = tid;
-			Simulator s1(file);
-			bool successfullAttack = false;
-
-			sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
-			for (unsigned int j = 0, m = MPIDX.size(); j < m; j++)
-			{
-				Planet& source = AP[MPIDX[j]];
-				int sid = source.PlanetID();
-				const int distance = pw.Distance(tid, sid);
-
-				// if we don't have enough ships anymore
-				if (source.NumShips() <= 1)
-				{
-					continue;
-				}
-
-				// if this planet has more value and is about to be captured, don't use it
-				if (source.GrowthRate() >= curTarget.GrowthRate() && !s.IsMyPlanet(sid))
-				{
-					continue;
-				}
-
-				s1.Start(distance, AP, AF);
-				int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
-
-				const int fleetSize = std::min<int>(source.NumShips() - 1, fleetsRequired);
-
-				Fleet order(1, fleetSize, sid, tid, distance, distance);
-				orders.push_back(order);
-				AF.push_back(order);
-				source.NumShips(source.NumShips() - fleetSize);
-
-				// See if given all previous orders, this planet will be ours
-				s1.Start(MAX_ROUNDS-round, AP, AF);
-				if (s1.IsMyPlanet(tid))
-				{
-					successfullAttack = true;
-					break;
-				}
-			}
-			if (successfullAttack)
-			{
-				for (unsigned int j = 0, m = orders.size(); j < m; j++)
-				{
-					Fleet& order = orders[j];
-					pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
-				}
-			}
-			else
-			{
-				AP = backupAP;
-				AF = backupAF;
+				//copy_backward(backupAP.begin(), backupAP.end(), AP.begin());
+				//copy_backward(backupAF.begin(), backupAF.end(), AF.begin());
 			}
 		}
 	}

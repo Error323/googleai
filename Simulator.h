@@ -27,6 +27,7 @@ public:
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
 	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
+	bool IsEnemyPlanet(int i) 		{ return AP[i].Owner() > 1; }
 	int MyScore()					{ return myNumShips; }
 	int EnemyScore()				{ return enemyNumShips; }
 	std::vector<Planet>& Planets()	{ return AP; }

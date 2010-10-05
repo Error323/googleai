@@ -11,6 +11,8 @@ void Simulator::Start(unsigned int totalTurns,
 					std::vector<Planet>& planets, 
 					std::vector<Fleet>& fleets) {
 
+	//copy_backward(planets.begin(), planets.end(), AP.begin());
+	//copy_backward(fleets.begin(), fleets.end(), AF.begin());
 	AP = planets;
 	AF = fleets;
 	myNumShips = enemyNumShips = 0;
