@@ -28,8 +28,9 @@ public:
 	bool Winning()					{ return myNumShips > enemyNumShips; }
 	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
 	bool IsEnemyPlanet(int i) 		{ return AP[i].Owner() > 1; }
-	int MyScore()					{ return myNumShips; }
-	int EnemyScore()				{ return enemyNumShips; }
+	int MyNumShips()				{ return myNumShips; }
+	int EnemyNumShips()				{ return enemyNumShips; }
+	int GetScore()					{ return myNumShips - enemyNumShips; }
 	std::vector<Planet>& Planets()	{ return AP; }
 	std::vector<Fleet>&  Fleets()	{ return AF; }
 	Planet& GetPlanet(int i)		{ return AP[i]; }

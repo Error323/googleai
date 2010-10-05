@@ -116,8 +116,13 @@ class Planet {
   void NumShips(int new_num_ships);
   void AddShips(int amount);
   void RemoveShips(int amount);
+  void Backup();
+  void Restore();
 
  private:
+  int bak_owner_;
+  int bak_num_ships_;
+
   int planet_id_;
   int owner_;
   int num_ships_;

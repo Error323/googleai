@@ -121,6 +121,16 @@ void Planet::RemoveShips(int amount) {
   num_ships_ -= amount;
 }
 
+void Planet::Backup() {
+  bak_owner_     = owner_;
+  bak_num_ships_ = num_ships_;
+}
+
+void Planet::Restore() {
+  owner_     = bak_owner_;
+  num_ships_ = bak_num_ships_;
+}
+
 PlanetWars::PlanetWars(const std::string& gameState) {
   ParseGameState(gameState);
 }
