@@ -81,8 +81,8 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 	std::vector<int>    EFIDX;  // enemy fleets
 	std::vector<int>    MFIDX;  // my fleets
 
-	Simulator s0(file);
-	Simulator s1(file);
+	Simulator s0;
+	Simulator s1;
 	s0.Start(MAX_ROUNDS-curRound, AP, AF);
 	int score = s0.GetScore();
 	int myNumShips    = 0;

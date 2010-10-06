@@ -36,8 +36,8 @@ class StringUtil {
 class Fleet {
  public:
   // Initializes a fleet.
-  Fleet(int owner,
-        int num_ships,
+  Fleet(int owner = -1,
+        int num_ships = -1,
         int source_planet = -1,
         int destination_planet = -1,
         int total_trip_length = -1,
@@ -141,6 +141,7 @@ class PlanetWars {
  public:
   // Initializes the game state given a string containing game state data.
   PlanetWars(const std::string& game_state);
+  PlanetWars(){}
 
   // Returns the number of planets on the map. Planets are numbered starting
   // with 0.

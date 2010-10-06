@@ -13,11 +13,9 @@ bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 }
 
 void Simulator::Start(unsigned int totalTurns, 
-					std::vector<Planet>& planets, 
-					std::vector<Fleet>& fleets) {
+					std::vector<Planet>& AP, 
+					std::vector<Fleet>& AF) {
 
-	AP = planets;
-	AF = fleets;
 	myNumShips = enemyNumShips = 0;
 	ownershipHistory.clear();
 	std::vector<int> skipPlanets;
@@ -184,6 +182,5 @@ Simulator::PlanetOwner& Simulator::GetFirstEnemyOwner(int i) {
 			return H[j];
 		}
 	}
-	LOG("[Simulator::GetFirstEnemyOwner] Couldn't find it\n");
 	return H[0];
 }

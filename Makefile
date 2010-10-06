@@ -5,4 +5,4 @@ all: MyBot
 clean:
 	rm -rf MyBot *.o *.txt
 
-MyBot: MyBot.o PlanetWars.o Simulator.o
+MyBot: MyBot.o PlanetWars.o Simulator.o AlphaBeta.o

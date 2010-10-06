@@ -11,10 +11,9 @@
 
 class Simulator {
 public:
-	Simulator(std::ofstream& filestream):
+	Simulator():
 		myNumShips(0),
-		enemyNumShips(0),
-		file(filestream)
+		enemyNumShips(0)
 	{
 	}
 
@@ -47,7 +46,6 @@ public:
 private:
 	int myNumShips;
 	int enemyNumShips;
-	std::ofstream& file;
 	std::vector<Planet> AP;
 	std::vector<Fleet>  AF;
 	// <planet, vec<owner, time> >
