@@ -6,6 +6,8 @@
 #include <vector>
 #include <map>
 #include <utility>
+#include <iostream>
+#include <fstream>
 
 #define LOG(msg)                  \
 	if (file.good())              \
@@ -15,15 +17,29 @@
 
 class Simulator {
 public:
-	Simulator(std::ofstream& filestream):
+	Simulator(std::ofstream& filestream, int id_):
 		myNumShips(0),
 		enemyNumShips(0),
-		file(filestream)
+		file(filestream),
+		id(id_)
 	{
 	}
 
+	struct PlanetOwner {
+		PlanetOwner(){}
+		PlanetOwner(int o, int t, int f):
+			owner(o),
+			time(t),
+			force(f)
+		{}
+		int owner;
+		int time;
+		int force;
+	};
+
 	void Start(unsigned int, std::vector<Planet>&, std::vector<Fleet>&);
-	std::vector<std::pair<int,int> >& GetOwnershipHistory(int i);
+	std::vector<PlanetOwner>& GetOwnershipHistory(int i);
+	PlanetOwner& GetFirstEnemyOwner(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
 	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
@@ -38,12 +54,13 @@ public:
 private:
 	int myNumShips;
 	int enemyNumShips;
+	int id;
 	std::ofstream& file;
 	std::vector<Planet> AP;
 	std::vector<Fleet>  AF;
 	// <planet, vec<owner, time> >
-	std::map<int, std::vector<std::pair<int, int> > > ownershipHistory;
-	void ChangeOwner(Planet& p, int owner, int time);
+	std::map<int, std::vector<PlanetOwner> > ownershipHistory;
+	void ChangeOwner(Planet& p, int owner, int time, int force);
 };
 
 #endif

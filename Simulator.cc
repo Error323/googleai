@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <fstream>
 #include <cassert>
+#include <iostream>
 
 bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 	if (a.DestinationPlanet() == b.DestinationPlanet())
@@ -68,6 +69,7 @@ void Simulator::Start(unsigned int totalTurns,
 		if (p.Owner() > 0)
 		{
 			p.AddShips(turnsRemaining*p.GrowthRate());
+			if (id == 0 && p.PlanetID() == 18) LOG("adding growth"<<p);
 		}
 
 		// If there are more then one force and if all forces are the same
@@ -83,7 +85,7 @@ void Simulator::Start(unsigned int totalTurns,
 		{
 			// Determine biggest force
 			int owner = p.Owner();
-			int force = p.NumShips();
+			int force = 0;
 			for (std::map<int,int>::iterator j = forces.begin(); j != forces.end(); j++)
 			{
 				if (j->second >= force)
@@ -97,12 +99,13 @@ void Simulator::Start(unsigned int totalTurns,
 			if (p.Owner() == owner)
 			{
 				p.AddShips(force);
+				if (id == 0 && p.PlanetID() == 18) LOG("adding force"<<p);
 			}
 			else
 			{
 				if (force > p.NumShips())
 				{
-					ChangeOwner(p, owner, turnsTaken);
+					ChangeOwner(p, owner, turnsTaken, force);
 				}
 				p.NumShips(abs(p.NumShips() - force));
 			}
@@ -115,10 +118,11 @@ void Simulator::Start(unsigned int totalTurns,
 			if (turnsTaken < totalTurns)
 			{
 				p.AddShips((totalTurns-turnsTaken)*p.GrowthRate());
+				if (id == 0 && p.PlanetID() == 18) LOG("adding remains"<<p);
 			}
 			turnsTaken = 0;
+			skipPlanets.push_back(p.PlanetID());
 		}
-		skipPlanets.push_back(p.PlanetID());
 	}
 
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
@@ -127,6 +131,7 @@ void Simulator::Start(unsigned int totalTurns,
 		if (p.Owner() != 0 && find(skipPlanets.begin(), skipPlanets.end(), p.PlanetID()) == skipPlanets.end())
 		{
 			p.AddShips(p.GrowthRate()*totalTurns);
+			if (id == 0 && p.PlanetID() == 18) LOG("NOT GOOD"<<p);
 		}
 
 		if (p.Owner() == 1)
@@ -160,22 +165,29 @@ void Simulator::Start(unsigned int totalTurns,
 	}
 }
 
-std::vector<std::pair<int,int> >& Simulator::GetOwnershipHistory(int i) { 
-	if (ownershipHistory.find(i) == ownershipHistory.end())
-	{
-		ownershipHistory[i] = std::vector<std::pair<int, int> >();
-	}
-
+std::vector<Simulator::PlanetOwner>& Simulator::GetOwnershipHistory(int i) { 
+	assert(ownershipHistory.find(i) != ownershipHistory.end());
 	return ownershipHistory[i]; 
 }
 
-void Simulator::ChangeOwner(Planet& p, int owner, int time) {
+void Simulator::ChangeOwner(Planet& p, int owner, int time, int force) {
 	if (ownershipHistory.find(p.PlanetID()) == ownershipHistory.end())
 	{
-		ownershipHistory[p.PlanetID()] = std::vector<std::pair<int, int> >();
-		ownershipHistory[p.PlanetID()].push_back(std::make_pair(p.Owner(), 0));
+		ownershipHistory[p.PlanetID()] = std::vector<PlanetOwner>();
 	}
-	ownershipHistory[p.PlanetID()].push_back(std::make_pair(owner, time));
-
+	ownershipHistory[p.PlanetID()].push_back(PlanetOwner(owner,time,force));
 	p.Owner(owner);
+}
+
+Simulator::PlanetOwner& Simulator::GetFirstEnemyOwner(int i) {
+	std::vector<Simulator::PlanetOwner>& H = GetOwnershipHistory(i);
+	for (unsigned int j = 0, n = H.size(); j < n; j++)
+	{
+		if (H[j].owner > 1)
+		{
+			return H[j];
+		}
+	}
+	LOG("[Simulator::GetFirstEnemyOwner] Couldn't find it\n");
+	return H[0];
 }

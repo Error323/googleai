@@ -18,18 +18,10 @@ PlanetWars* globalPW     = NULL;
 int         globalTarget = 0;
 int         globalRemain = 0;
 
-bool SortOnGrowthRateAndTurnsRemainingAndPlanet(const int fidA, const int fidB) {
-	const Fleet& fA = globalPW->GetFleet(fidA);
-	const Fleet& fB = globalPW->GetFleet(fidB);
-	const Planet& pA = globalPW->GetPlanet(fA.DestinationPlanet());
-	const Planet& pB = globalPW->GetPlanet(fB.DestinationPlanet());
-	if (pA.PlanetID() == pB.PlanetID())
-		return fA.TurnsRemaining() < fB.TurnsRemaining();
-	else
-	if (pA.GrowthRate() == pB.GrowthRate())
-		return pA.PlanetID() < pB.PlanetID();
-	else
-		return pA.GrowthRate() > pB.GrowthRate();
+bool SortOnGrowthRate(const int pidA, const int pidB) {
+	const Planet& a = globalPW->GetPlanet(pidA);
+	const Planet& b = globalPW->GetPlanet(pidB);
+	return a.GrowthRate() > b.GrowthRate();
 }
 
 // sorts like this: [1 2 ... 0 -1 -2 ...]
@@ -103,89 +95,105 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		}
 	}
 
-	Simulator s(file);
-	s.Start(MAX_ROUNDS-round, AP, AF);
-	int score = s.GetScore();
+	Simulator s0(file, 0);
+	Simulator s1(file, 1);
+	LOG("init s0");
+	s0.Start(MAX_ROUNDS-round, AP, AF);
+	int score = s0.GetScore();
 
-	// (1) defend our planets
-	sort(EFIDX.begin(), EFIDX.end(), SortOnGrowthRateAndTurnsRemainingAndPlanet);
-	for (unsigned int i = 0, n = EFIDX.size(); i < n; i++)
+	// (1) defend our planets which are to be captured in the future
+	std::vector<int> TPIDX;  // targetted planets
+	std::vector<int> NTPIDX; // not targetted planets
+	for (unsigned int i = 0, n = MPIDX.size(); i < n; i++)
 	{
-		Fleet&  f      = AF[EFIDX[i]];
-		const int tid  = f.DestinationPlanet();
-		Planet& curTarget = AP[f.DestinationPlanet()];
-
-		if (curTarget.Owner() == 1 && s.IsEnemyPlanet(tid))
+		Planet& curTarget = AP[MPIDX[i]];
+		const int tid = curTarget.PlanetID();
+		if (curTarget.Owner() == 1 && s0.IsEnemyPlanet(tid))
 		{
-			std::vector<Fleet>  orders;
-			curTarget.Backup();
-			
-			globalTarget = tid;
-			Simulator s1(file);
-			bool successfullAttack = false;
-			sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
-			for (unsigned int j = 0, m = MPIDX.size(); j < m; j++)
+			TPIDX.push_back(tid);
+		}
+		else
+		{
+			NTPIDX.push_back(tid);
+		}
+	}
+	
+	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
+	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
+	{
+		Planet& curTarget = AP[TPIDX[i]];
+		const int tid = curTarget.PlanetID();
+		std::vector<Fleet>  orders;
+		curTarget.Backup();
+		LOG("TARGET: " << curTarget);
+		
+		globalTarget = tid;
+		bool successfullAttack = false;
+		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+		{
+			Planet& source = AP[NTPIDX[j]];
+			source.Backup();
+			int sid = source.PlanetID();
+
+			// if we don't have enough ships anymore
+			if (source.NumShips() <= 0)
 			{
-				Planet& source = AP[MPIDX[j]];
-				source.Backup();
-				int sid = source.PlanetID();
-
-				// if we don't have enough ships anymore
-				if (source.NumShips() <= 0)
-				{
-					continue;
-				}
-
-				// if this planet has more value and is about to be captured, don't use it
-				if (source.GrowthRate() >= curTarget.GrowthRate() && s.IsEnemyPlanet(sid))
-				{
-					continue;
-				}
-
-				const int distance = pw.Distance(tid, sid);
-				s1.Start(f.TurnsRemaining(), AP, AF);
-				if (s1.IsMyPlanet(tid))
-				{
-					break;
-				}
-								
-				int fleetsRequired = s1.GetPlanet(tid).NumShips();
-
-				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
-
-				Fleet order(1, fleetSize, sid, tid, distance, distance);
-				orders.push_back(order);
-				AF.push_back(order);
-				source.NumShips(source.NumShips() - fleetSize);
-
-				// See if given all previous orders, this planet will be ours
-				s1.Start(MAX_ROUNDS-round, AP, AF);
-				int tmpScore = s1.GetScore();
-				if (tmpScore >= score)
-				{
-					successfullAttack = true;
-					score = tmpScore;
-					break;
-				}
+				continue;
 			}
-			if (successfullAttack)
+
+			const int distance = pw.Distance(tid, sid);
+			s1.Start(distance, AP, AF);
+			Planet& s1P = s1.GetPlanet(tid);
+			while (s0.IsEnemyPlanet(tid) && source.NumShips() > 0)
 			{
-				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+				Simulator::PlanetOwner& enemy = s0.GetFirstEnemyOwner(tid);
+				int numShips;
+				if (distance < enemy.time)
 				{
-					Fleet& order = orders[j];
-					pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
+					numShips = enemy.force - (curTarget.NumShips() + enemy.time*curTarget.GrowthRate());
 				}
+				else
+				if (distance > enemy.time)
+				{
+					numShips = s1P.NumShips() + 1;
+				}
+				else
+				{
+					numShips = enemy.force;
+				}
+				numShips = std::min<int>(source.NumShips(), numShips);
+				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
+				AF.push_back(orders.back());
+				source.NumShips(source.NumShips() - numShips);
+				LOG(orders.back());
+				s0.Start(MAX_ROUNDS-round, AP, AF);
 			}
-			else // restore previous state
+			if (s0.IsMyPlanet(tid))
 			{
-				AP[curTarget.PlanetID()].Restore();
-				for (unsigned int j = 0, m = orders.size(); j < m; j++)
-				{
-					Fleet& order = orders[j];
-					AP[order.SourcePlanet()].Restore();
-				}
-				AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
+				successfullAttack = true;
+				score = s0.GetScore();
+				break;
 			}
+		}
+		if (successfullAttack)
+		{
+			for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			{
+				Fleet& order = orders[j];
+				LOG("\t"<<order);
+				pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
+			}
+		}
+		else // restore previous state
+		{
+			AP[curTarget.PlanetID()].Restore();
+			for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			{
+				Fleet& order = orders[j];
+				AP[order.SourcePlanet()].Restore();
+			}
+			AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
 		}
 	}
 	
@@ -196,25 +204,24 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		int tid = curTarget.PlanetID();
 
 		// This neutral planet will be captured by the enemy
-		if (s.IsEnemyPlanet(tid))
+		if (s0.IsEnemyPlanet(tid))
 		{
-			std::vector<std::pair<int,int> >& history = s.GetOwnershipHistory(tid);
+			std::vector<Simulator::PlanetOwner>& history = s0.GetOwnershipHistory(tid);
 
 			std::vector<Fleet>  orders;
 			curTarget.Backup();
 			
 			globalTarget = tid;
-			globalRemain = history.back().second;
+			globalRemain = history.back().time;
 
-			Simulator s1(file);
 			s1.Start(globalRemain, AP, AF);
 
 			bool successfullAttack = false;
 
-			sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToFleet);
-			for (unsigned int j = 0, m = MPIDX.size(); j < m; j++)
+			sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToFleet);
+			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 			{
-				Planet& source = AP[MPIDX[j]];
+				Planet& source = AP[NTPIDX[j]];
 				source.Backup();
 				int sid = source.PlanetID();
 				const int distance = pw.Distance(tid, sid);
@@ -278,7 +285,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	{
 		Planet& curTarget = AP[NMPIDX[i]];
 		const int tid = curTarget.PlanetID();
-		if (s.IsMyPlanet(tid) || (curTarget.Owner() == 0 && s.IsEnemyPlanet(tid)))
+		if (s0.IsMyPlanet(tid) || (curTarget.Owner() == 0 && s0.IsEnemyPlanet(tid)))
 		{
 			continue;
 		}
@@ -287,13 +294,12 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		curTarget.Backup();
 		
 		globalTarget = tid;
-		Simulator s1(file);
 		bool successfullAttack = false;
 
-		sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
-		for (unsigned int j = 0, m = MPIDX.size(); j < m; j++)
+		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 		{
-			Planet& source = AP[MPIDX[j]];
+			Planet& source = AP[NTPIDX[j]];
 			source.Backup();
 			const int sid = source.PlanetID();
 			const int distance = pw.Distance(tid, sid);
@@ -305,7 +311,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			}
 
 			// if this planet has more value and is about to be captured, don't use it
-			if (source.GrowthRate() >= curTarget.GrowthRate() && s.IsEnemyPlanet(sid))
+			if (source.GrowthRate() >= curTarget.GrowthRate() && s0.IsEnemyPlanet(sid))
 			{
 				continue;
 			}
