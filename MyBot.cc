@@ -10,7 +10,7 @@
 #include <utility>
 
 
-#define VERSION "9.0"
+#define VERSION "10.0"
 
 #define MAX_ROUNDS 200
 
