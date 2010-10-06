@@ -9,19 +9,12 @@
 #include <iostream>
 #include <fstream>
 
-#define LOG(msg)                  \
-	if (file.good())              \
-	{                             \
-		file << msg << std::endl; \
-	}
-
 class Simulator {
 public:
-	Simulator(std::ofstream& filestream, int id_):
+	Simulator(std::ofstream& filestream):
 		myNumShips(0),
 		enemyNumShips(0),
-		file(filestream),
-		id(id_)
+		file(filestream)
 	{
 	}
 
@@ -54,7 +47,6 @@ public:
 private:
 	int myNumShips;
 	int enemyNumShips;
-	int id;
 	std::ofstream& file;
 	std::vector<Planet> AP;
 	std::vector<Fleet>  AF;

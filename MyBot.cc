@@ -81,8 +81,8 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 	std::vector<int>    EFIDX;  // enemy fleets
 	std::vector<int>    MFIDX;  // my fleets
 
-	Simulator s0(file, 0);
-	Simulator s1(file, 1);
+	Simulator s0(file);
+	Simulator s1(file);
 	s0.Start(MAX_ROUNDS-curRound, AP, AF);
 	int score = s0.GetScore();
 	int myNumShips    = 0;
@@ -112,14 +112,6 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 				enemyNumShips += p.NumShips();
 			} break;
 		}
-	}
-
-	static int sDistance;
-	if (curRound == 0)
-	{
-		double x = (AP[NTPIDX[0]].X() - AP[EPIDX[0]].X());
-		double y = (AP[NTPIDX[0]].Y() - AP[EPIDX[0]].Y());
-		sDistance = int(round(sqrt(x*x + y*y)));
 	}
 
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
@@ -251,7 +243,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 
 	// (3) annihilate when we are definitly winning
 	LOG("(3) ANNIHILATE");
-	if (myNumShips > enemyNumShips*2)
+	if (myNumShips >= enemyNumShips*2)
 	{
 		sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
 		for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
