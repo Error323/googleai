@@ -69,7 +69,6 @@ void Simulator::Start(unsigned int totalTurns,
 		if (p.Owner() > 0)
 		{
 			p.AddShips(turnsRemaining*p.GrowthRate());
-			if (id == 0 && p.PlanetID() == 18) LOG("adding growth"<<p);
 		}
 
 		// If there are more then one force and if all forces are the same
@@ -99,7 +98,6 @@ void Simulator::Start(unsigned int totalTurns,
 			if (p.Owner() == owner)
 			{
 				p.AddShips(force);
-				if (id == 0 && p.PlanetID() == 18) LOG("adding force"<<p);
 			}
 			else
 			{
@@ -118,7 +116,6 @@ void Simulator::Start(unsigned int totalTurns,
 			if (turnsTaken < totalTurns)
 			{
 				p.AddShips((totalTurns-turnsTaken)*p.GrowthRate());
-				if (id == 0 && p.PlanetID() == 18) LOG("adding remains"<<p);
 			}
 			turnsTaken = 0;
 			skipPlanets.push_back(p.PlanetID());
@@ -131,7 +128,6 @@ void Simulator::Start(unsigned int totalTurns,
 		if (p.Owner() != 0 && find(skipPlanets.begin(), skipPlanets.end(), p.PlanetID()) == skipPlanets.end())
 		{
 			p.AddShips(p.GrowthRate()*totalTurns);
-			if (id == 0 && p.PlanetID() == 18) LOG("NOT GOOD"<<p);
 		}
 
 		if (p.Owner() == 1)

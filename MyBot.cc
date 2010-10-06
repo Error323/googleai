@@ -53,10 +53,19 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	globalPW = &pw;
 	std::vector<Planet> AP = pw.Planets();
-	std::vector<int>    MPIDX;
-	std::vector<int>    NPIDX;
-	std::vector<int>    EPIDX;
-	std::vector<int>    NMPIDX;
+	std::vector<Fleet>  AF = pw.Fleets();
+	std::vector<int>    NPIDX;  // neutral planets
+	std::vector<int>    EPIDX;  // enemy planets
+	std::vector<int>    NMPIDX; // not my planets
+	std::vector<int>    TPIDX;  // targetted planets belonging to us
+	std::vector<int>    NTPIDX; // not targetted planets belonging to us
+	std::vector<int>    EFIDX;  // enemy fleets
+	std::vector<int>    MFIDX;  // my fleets
+
+	Simulator s0(file, 0);
+	Simulator s1(file, 1);
+	s0.Start(MAX_ROUNDS-round, AP, AF);
+	int score = s0.GetScore();
 
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
@@ -69,7 +78,10 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			} break;
 
 			case 1: {
-				MPIDX.push_back(i);
+				if (p.Owner() == 1 && s0.IsEnemyPlanet(p.PlanetID()))
+					TPIDX.push_back(p.PlanetID());
+				else
+					NTPIDX.push_back(p.PlanetID());
 			} break;
 
 			default: {
@@ -79,45 +91,17 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		}
 	}
 
-	std::vector<Fleet>  AF = pw.Fleets();
-	std::vector<int>    EFIDX;
-	std::vector<int>    MFIDX;
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
 		if (f.Owner() == 1)
-		{
 			MFIDX.push_back(i);
-		}
 		else
-		{
 			EFIDX.push_back(i);
-		}
 	}
 
-	Simulator s0(file, 0);
-	Simulator s1(file, 1);
-	LOG("init s0");
-	s0.Start(MAX_ROUNDS-round, AP, AF);
-	int score = s0.GetScore();
 
 	// (1) defend our planets which are to be captured in the future
-	std::vector<int> TPIDX;  // targetted planets
-	std::vector<int> NTPIDX; // not targetted planets
-	for (unsigned int i = 0, n = MPIDX.size(); i < n; i++)
-	{
-		Planet& curTarget = AP[MPIDX[i]];
-		const int tid = curTarget.PlanetID();
-		if (curTarget.Owner() == 1 && s0.IsEnemyPlanet(tid))
-		{
-			TPIDX.push_back(tid);
-		}
-		else
-		{
-			NTPIDX.push_back(tid);
-		}
-	}
-	
 	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
@@ -125,10 +109,10 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		const int tid = curTarget.PlanetID();
 		std::vector<Fleet>  orders;
 		curTarget.Backup();
-		LOG("TARGET: " << curTarget);
 		
 		globalTarget = tid;
 		bool successfullAttack = false;
+		LOG(curTarget);
 		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
 		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 		{
@@ -151,22 +135,24 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 				int numShips;
 				if (distance < enemy.time)
 				{
+					LOG("distance < enemy.time\t"<<enemy.time<<", "<<enemy.force);
 					numShips = enemy.force - (curTarget.NumShips() + enemy.time*curTarget.GrowthRate());
 				}
 				else
 				if (distance > enemy.time)
 				{
+					LOG("distance > enemy.time");
 					numShips = s1P.NumShips() + 1;
 				}
 				else
 				{
+					LOG("distance = enemy.time");
 					numShips = enemy.force;
 				}
 				numShips = std::min<int>(source.NumShips(), numShips);
 				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
 				AF.push_back(orders.back());
 				source.NumShips(source.NumShips() - numShips);
-				LOG(orders.back());
 				s0.Start(MAX_ROUNDS-round, AP, AF);
 			}
 			if (s0.IsMyPlanet(tid))
@@ -181,7 +167,6 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			for (unsigned int j = 0, m = orders.size(); j < m; j++)
 			{
 				Fleet& order = orders[j];
-				LOG("\t"<<order);
 				pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
 			}
 		}
@@ -206,55 +191,37 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		// This neutral planet will be captured by the enemy
 		if (s0.IsEnemyPlanet(tid))
 		{
-			std::vector<Simulator::PlanetOwner>& history = s0.GetOwnershipHistory(tid);
-
 			std::vector<Fleet>  orders;
 			curTarget.Backup();
 			
 			globalTarget = tid;
-			globalRemain = history.back().time;
-
-			s1.Start(globalRemain, AP, AF);
-
+			Simulator::PlanetOwner& enemy = s0.GetFirstEnemyOwner(tid);
 			bool successfullAttack = false;
-
-			sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToFleet);
+			sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
 			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 			{
 				Planet& source = AP[NTPIDX[j]];
 				source.Backup();
 				int sid = source.PlanetID();
 				const int distance = pw.Distance(tid, sid);
+				LOG(distance<<" | "<<enemy.owner<<"\t"<<enemy.time<<"\t"<<enemy.force);
 
-				// if the first planet is still too close don't attack yet
-				if (j == 0 && distance <= globalRemain)
-				{
+				// if we are still too close don't attack
+				if (distance <= enemy.time)
 					break;
-				}
-
-				// if we don't have enough ships anymore
-				if (source.NumShips() <= 0)
-				{
-					continue;
-				}
 
 				s1.Start(distance, AP, AF);
-				int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
-
+				const int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
 				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
-
-				Fleet order(1, fleetSize, sid, tid, distance, distance);
-				orders.push_back(order);
-				AF.push_back(order);
+				orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
+				AF.push_back(orders.back());
 				source.NumShips(source.NumShips() - fleetSize);
 
 				// See if given all previous orders, this planet will be ours
-				s1.Start(MAX_ROUNDS-round, AP, AF);
-				int tmpScore = s1.GetScore();
-				if (tmpScore >= score)
+				s1.Start(distance, AP, AF);
+				if (s1.IsMyPlanet(tid))
 				{
 					successfullAttack = true;
-					score = tmpScore;
 					break;
 				}
 			}
@@ -279,7 +246,9 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		}
 	}
 
+/*
 	// (3) capture good planets
+	s0.Start(MAX_ROUNDS-round, AP, AF);
 	sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
 	for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
 	{
@@ -329,7 +298,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			// See if given all previous orders, this planet will be ours
 			s1.Start(MAX_ROUNDS-round, AP, AF);
 			int tmpScore = s1.GetScore();
-			if (tmpScore >= score)
+			if (s1.IsMyPlanet(tid))
 			{
 				successfullAttack = true;
 				score = tmpScore;
@@ -355,6 +324,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
 		}
 	}
+*/
 }
 
 
