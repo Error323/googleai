@@ -40,14 +40,21 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 }
 
 void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
-						std::vector<Planet>& AP, std::vector<Fleet>& AF) {
+			std::vector<Planet>& AP, std::vector<Fleet>& AF, std::ofstream& file) {
 	if (success)
 	{
 		for (unsigned int j = 0, m = orders.size(); j < m; j++)
 		{
 			Fleet& order = orders[j];
-			globalPW->IssueOrder(order.SourcePlanet(),
-						order.DestinationPlanet(), order.NumShips());
+			if (order.NumShips() > 0)
+			{
+				globalPW->IssueOrder(order.SourcePlanet(),
+					order.DestinationPlanet(), order.NumShips());
+			}
+			else
+			{
+				LOG("ERROR: order has 0 ships - "<<order);
+			}
 		}
 	}
 	else // restore previous state
@@ -62,7 +69,7 @@ void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
 	}
 }
 
-void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
+void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 	globalPW = &pw;
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
@@ -76,7 +83,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 
 	Simulator s0(file, 0);
 	Simulator s1(file, 1);
-	s0.Start(MAX_ROUNDS-round, AP, AF);
+	s0.Start(MAX_ROUNDS-curRound, AP, AF);
 	int score = s0.GetScore();
 	int myNumShips    = 0;
 	int enemyNumShips = 0;
@@ -107,6 +114,14 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		}
 	}
 
+	static int sDistance;
+	if (curRound == 0)
+	{
+		double x = (AP[NTPIDX[0]].X() - AP[EPIDX[0]].X());
+		double y = (AP[NTPIDX[0]].Y() - AP[EPIDX[0]].Y());
+		sDistance = int(round(sqrt(x*x + y*y)));
+	}
+
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
@@ -128,10 +143,9 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
-		Planet& curTarget = AP[TPIDX[i]];
-		const int tid = curTarget.PlanetID();
+		Planet& target = AP[TPIDX[i]];
+		const int tid = target.PlanetID();
 		std::vector<Fleet>  orders;
-		curTarget.Backup();
 		
 		globalTarget = tid;
 		bool successfullAttack = false;
@@ -139,6 +153,8 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 		{
 			Planet& source = AP[NTPIDX[j]];
+			if (source.NumShips() <= 0)
+				continue;
 			source.Backup();
 			int sid = source.PlanetID();
 
@@ -152,7 +168,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 
 				if (distance < enemy.time)
 				{
-					numShips = enemy.force - (curTarget.NumShips() + enemy.time*curTarget.GrowthRate());
+					numShips = enemy.force - (target.NumShips() + enemy.time*target.GrowthRate());
 					LOG("distance < enemy.time, ships: "<<numShips);
 				}
 				else
@@ -173,30 +189,28 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
 				AF.push_back(orders.back());
 				source.NumShips(source.NumShips() - numShips);
-				s0.Start(MAX_ROUNDS-round, AP, AF);
+				s0.Start(MAX_ROUNDS-curRound, AP, AF);
 			}
 			if (s0.IsMyPlanet(tid))
 			{
 				successfullAttack = true;
-				score = s0.GetScore();
 				break;
 			}
 		}
-		AcceptOrRestore(successfullAttack, curTarget, orders, AP, AF);
+		AcceptOrRestore(successfullAttack, target, orders, AP, AF, file);
 	}
 	
 	// (2) overtake neutral planets captured by enemy in the future
 	LOG("(2) ANNOY");
 	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
-		Planet& curTarget = AP[NPIDX[i]];
-		int tid = curTarget.PlanetID();
+		Planet& target = AP[NPIDX[i]];
+		int tid = target.PlanetID();
 
 		// This neutral planet will be captured by the enemy
 		if (s0.IsEnemyPlanet(tid))
 		{
 			std::vector<Fleet>  orders;
-			curTarget.Backup();
 			
 			globalTarget = tid;
 			Simulator::PlanetOwner& enemy = s0.GetFirstEnemyOwner(tid);
@@ -205,6 +219,9 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 			{
 				Planet& source = AP[NTPIDX[j]];
+				if (source.NumShips() <= 0)
+					continue;
+
 				source.Backup();
 				int sid = source.PlanetID();
 				const int distance = pw.Distance(tid, sid);
@@ -228,7 +245,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 					break;
 				}
 			}
-			AcceptOrRestore(successfullAttack, curTarget, orders, AP, AF);
+			AcceptOrRestore(successfullAttack, target, orders, AP, AF, file);
 		}
 	}
 
@@ -239,11 +256,10 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 		sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
 		for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
 		{
-			Planet& curTarget = AP[NMPIDX[i]];
-			int tid = curTarget.PlanetID();
+			Planet& target = AP[NMPIDX[i]];
+			int tid = target.PlanetID();
 
 			std::vector<Fleet> orders;
-			curTarget.Backup();
 			
 			globalTarget = tid;
 			bool successfullAttack = false;
@@ -251,6 +267,8 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 			{
 				Planet& source = AP[NTPIDX[j]];
+				if (source.NumShips() <= 0)
+					continue;
 				source.Backup();
 				int sid = source.PlanetID();
 				const int distance = pw.Distance(tid, sid);
@@ -263,14 +281,15 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 				source.NumShips(source.NumShips() - fleetSize);
 
 				// See if given all previous orders, this planet will be ours
-				s1.Start(distance, AP, AF);
-				if (s1.IsMyPlanet(tid))
+				s1.Start(MAX_ROUNDS-curRound, AP, AF);
+				if (s1.GetScore() >= score)
 				{
+					score = s1.GetScore();
 					successfullAttack = true;
 					break;
 				}
 			}
-			AcceptOrRestore(successfullAttack, curTarget, orders, AP, AF);
+			AcceptOrRestore(successfullAttack, target, orders, AP, AF, file);
 		}
 	}
 }
@@ -279,7 +298,7 @@ void DoTurn(PlanetWars& pw, int round, std::ofstream& file) {
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
-	unsigned int round = 0;
+	unsigned int curRound = 0;
 	std::ofstream file;
 	std::string filename("-Error323-v");
 	filename = argv[0] + filename + VERSION + ".txt";
@@ -295,11 +314,11 @@ int main(int argc, char *argv[]) {
 			{
 				PlanetWars pw(map_data);
 				map_data = "";
-				LOG("round: " << round);
+				LOG("curRound: " << curRound);
 				LOG(pw.ToString());
-				DoTurn(pw, round, file);
+				DoTurn(pw, curRound, file);
 				LOG("\n--------------------------------------------------------------------------------\n");
-				round++;
+				curRound++;
 				pw.FinishTurn();
 			} 
 			else 
