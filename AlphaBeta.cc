@@ -23,11 +23,12 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
 	nodesVisited = 0;
+	bestScore    = std::numeric_limits<int>::min();
 
 	turn     = t;
 	// NOTE: maxDepth should ALWAYS be unequal
 	maxDepth = (MAX_ROUNDS-turn+1)*2;
-	maxDepth = std::min<int>(maxDepth, 2);
+	maxDepth = std::min<int>(maxDepth, 4);
 
 	Node origin(true, AP, AF, file);
 	int score = Search(origin, 0, std::numeric_limits<int>::min(),
@@ -63,6 +64,16 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	{
 		child.AddAction(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
+		if (depth == 0 && alpha > bestScore)
+		{
+			bestOrders.clear();
+			std::vector<Fleet>& orders = child.GetOrders();
+			for (unsigned int i = 0, n = orders.size(); i < n; i++)
+			{
+				bestOrders.push_back(orders[i]);
+			}
+			bestScore = alpha;
+		}
 		child.RemoveAction(simulate, actions[i].size());
 
 		if (beta <= alpha)
@@ -70,19 +81,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 			break;
 		}
 	}
-	if (depth == 1)
-	{
-		if (beta > bestScore)
-		{
-			bestOrders.clear();
-			std::vector<Fleet>& orders = node.GetOrders();
-			for (unsigned int i = 0, n = orders.size(); i < n; i++)
-			{
-				bestOrders.push_back(orders[i]);
-			}
-			bestScore = beta;
-		}
-	}
+
 	if (simulate)
 	{
 		node.RestoreSimulation();
@@ -254,18 +253,18 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	gAP = &AP;
 	std::vector<std::vector<Fleet> > actions;
-	sort(NPIDX.begin(), NPIDX.end(), SortOnGrowthShipRatio);
-	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
+	sort(APIDX.begin(), APIDX.end(), SortOnGrowthShipRatio);
+	for (unsigned int i = 0, n = APIDX.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
-		Planet& target = AP[NPIDX[i]];
+		Planet& target = AP[APIDX[i]];
 		int totalFleet = 0;
 		gTarget = target.PlanetID();
 		sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
 		for (unsigned int k = 0, m = MPIDX.size(); k < m; k++)
 		{
 			Planet& source = AP[MPIDX[k]];
-			if (source.NumShips() <= 0)
+			if (source.NumShips() <= 0 || target.PlanetID() == source.PlanetID())
 				continue;
 			const int distance = Distance(target, source);
 			int fleetSize = std::min<int>(source.NumShips(), target.NumShips()+1);
