@@ -7,6 +7,17 @@
 #include <vector>
 #include <limits>
 
+#define MAX_ROUNDS 200
+
+#define LOGD(depth, msg)                      \
+	if (file.good())                          \
+	{                                         \
+		std::stringstream ss;                 \
+		for (int i = 0; i < depth; i++)       \
+			ss << "\t";                       \
+		file << ss.str() << msg << std::endl; \
+	}
+
 class AlphaBeta {
 public:
 	AlphaBeta(PlanetWars& pw_, std::ofstream& file_):
