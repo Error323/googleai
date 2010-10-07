@@ -25,8 +25,8 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 	nodesVisited = 0;
 
 	turn     = t;
-	// NOTE: maxDepth should ALWAYS be equal
-	maxDepth = (MAX_ROUNDS-turn)*2;
+	// NOTE: maxDepth should ALWAYS be unequal
+	maxDepth = (MAX_ROUNDS-turn+1)*2;
 	maxDepth = std::min<int>(maxDepth, 2);
 
 	Node origin(true, AP, AF, file);
@@ -41,13 +41,20 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 {
 	nodesVisited++;
 	bool simulate = (depth > 0 && depth % 2 == 0);
+	if (simulate)
+	{
+		node.ApplySimulation();
+	}
 
 	LOG2(depth, "D("<<depth<<") M("<<node.myNumShips<<") E("<<node.enemyNumShips<<")");
-
 	if (depth == maxDepth || node.IsTerminal(simulate))
 	{
-		assert(depth % 2 == 0);
-		return node.GetScore();
+		if (maxDepth % 2 != 0)
+		{
+			LOG("ERROR: maxDepth should be an even number - "<<maxDepth);
+		}
+		int score = node.GetScore();
+		return score;
 	}
 	
 	std::vector<std::vector<Fleet> > actions = node.GetActions();
@@ -55,15 +62,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
 		child.AddAction(actions[i]);
-		if (simulate)
-		{
-			child.ApplySimulation();
-		}
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
-		if (simulate)
-		{
-			child.RestoreSimulation();
-		}
 		child.RemoveAction(simulate, actions[i].size());
 
 		if (beta <= alpha)
@@ -73,15 +72,20 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	}
 	if (depth == 1)
 	{
-		if (beta > bestScore)
+		if (alpha > bestScore)
 		{
 			bestOrders.clear();
 			std::vector<Fleet>& orders = node.GetOrders();
-			for (unsigned int i = 0, n = orders.size(); i < n; i++) {
+			for (unsigned int i = 0, n = orders.size(); i < n; i++)
+			{
 				bestOrders.push_back(orders[i]);
 			}
-			bestScore = beta;
+			bestScore = alpha;
 		}
+	}
+	if (simulate)
+	{
+		node.RestoreSimulation();
 	}
 	return alpha;
 }
@@ -214,8 +218,17 @@ bool AlphaBeta::Node::IsTerminal(bool simulate) {
 		return false;
 }
 
+// Below this line is very messy atm
+
 std::vector<Planet>* gAP;
 int gTarget;
+
+int Distance(const Planet& a, const Planet& b) {
+	double x = a.X()-b.X();
+	double y = a.Y()-b.Y();
+	return int(ceil(sqrt(x*x + y*y)));
+}
+
 bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
 	const Planet& b = gAP->at(pidB);
@@ -230,8 +243,8 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 	Planet& t      = gAP->at(gTarget);
 	Planet& a      = gAP->at(pidA);
 	Planet& b      = gAP->at(pidB);
-	int distA = ceil(sqrt(pow(t.X()-a.X(),2.0) + pow(t.Y()-a.Y(), 2.0)));
-	int distB = ceil(sqrt(pow(t.X()-b.X(),2.0) + pow(t.Y()-b.Y(), 2.0)));
+	int distA = Distance(a, t);
+	int distB = Distance(b, t);
 	return distA < distB;
 }
 
@@ -240,24 +253,27 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	gAP = &AP;
 	std::vector<std::vector<Fleet> > actions;
 	sort(NMP.begin(), NMP.end(), SortOnGrowthShipRatio);
-	for (unsigned int i = 0; i < NMP.size(); i++)
+	for (unsigned int i = 0, n = NMP.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
 		Planet& target = AP[NMP[i]];
 		int totalFleet = 0;
+		gTarget = target.PlanetID();
+		sort(MP.begin(), MP.end(), SortOnDistanceToTarget);
 		for (unsigned int k = 0, m = MP.size(); k < m; k++)
 		{
 			Planet& source = AP[MP[k]];
 			if (source.NumShips() <= 0)
 				continue;
+			const int distance = Distance(target, source);
 			int fleetSize = std::min<int>(source.NumShips(), target.NumShips()+1);
 			orders.push_back(Fleet(1, fleetSize, source.PlanetID(),
-				target.PlanetID(), 0, 0));
+				target.PlanetID(), distance, distance));
 			totalFleet += fleetSize;
-			if (totalFleet == target.NumShips()+1)
+			if (totalFleet >= target.NumShips()+1)
 				break;
 		}
-		if (totalFleet == target.NumShips()+1)
+		if (totalFleet >= target.NumShips()+1)
 			actions.push_back(orders);
 	}
 	return actions;
