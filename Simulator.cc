@@ -14,11 +14,17 @@ bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 
 void Simulator::Start(int totalTurns, 
 					std::vector<Planet>& AP, 
-					std::vector<Fleet>& AF) {
+					std::vector<Fleet>& AF, bool backup) {
 
 	myNumShips = enemyNumShips = 0;
 	ownershipHistory.clear();
 	std::vector<int> skipPlanets;
+
+	if (backup)
+	{
+		AF_.clear();
+		AP_.clear();
+	}
 
 	sort(AF.begin(), AF.end(), SortOnPlanetAndTurnsLeft);
 
@@ -27,6 +33,11 @@ void Simulator::Start(int totalTurns,
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
+		if (backup)
+		{
+			AF_.push_back(f);
+			f = AF_.back();
+		}
 		if (f.TurnsRemaining() <= 0)
 			continue;
 
@@ -66,6 +77,11 @@ void Simulator::Start(int totalTurns,
 		
 		// Add ship growth for non-neutral planets
 		Planet& p = AP[f.DestinationPlanet()];
+		if (backup)
+		{
+			AP_.push_back(p);
+			p = AP_.back();
+		}
 		if (p.Owner() > 0)
 		{
 			p.AddShips(turnsRemaining*p.GrowthRate());

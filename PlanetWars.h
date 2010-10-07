@@ -129,8 +129,9 @@ class Planet {
   void Restore();
 
  private:
-  int bak_owner_;
-  int bak_num_ships_;
+  std::vector<int> stack_owner_;
+  std::vector<int> stack_num_ships_;
+  int stack_ptr_;
 
   int planet_id_;
   int owner_;

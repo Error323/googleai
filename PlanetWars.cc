@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#define MAX_STACK_SIZE 3
+
 void StringUtil::Tokenize(const std::string& s,
                           const std::string& delimiters,
                           std::vector<std::string>& tokens) {
@@ -79,6 +81,11 @@ Planet::Planet(int planet_id,
   growth_rate_ = growth_rate;
   x_ = x;
   y_ = y;
+  stack_ptr_ = 0;
+  stack_owner_.reserve(MAX_STACK_SIZE);
+  stack_owner_.resize(MAX_STACK_SIZE);
+  stack_num_ships_.reserve(MAX_STACK_SIZE);
+  stack_num_ships_.resize(MAX_STACK_SIZE);
 }
 
 int Planet::PlanetID() const {
@@ -122,13 +129,15 @@ void Planet::RemoveShips(int amount) {
 }
 
 void Planet::Backup() {
-  bak_owner_     = owner_;
-  bak_num_ships_ = num_ships_;
+  stack_owner_[stack_ptr_]     = owner_;
+  stack_num_ships_[stack_ptr_] = num_ships_;
+  stack_ptr_++;
 }
 
 void Planet::Restore() {
-  owner_     = bak_owner_;
-  num_ships_ = bak_num_ships_;
+  stack_ptr_--;
+  owner_     = stack_owner_[stack_ptr_];
+  num_ships_ = stack_num_ships_[stack_ptr_];
 }
 
 PlanetWars::PlanetWars(const std::string& gameState) {
