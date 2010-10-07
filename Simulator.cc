@@ -12,7 +12,7 @@ bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 		return a.DestinationPlanet() < b.DestinationPlanet();
 }
 
-void Simulator::Start(unsigned int totalTurns, 
+void Simulator::Start(int totalTurns, 
 					std::vector<Planet>& AP, 
 					std::vector<Fleet>& AF) {
 

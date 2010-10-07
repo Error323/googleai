@@ -12,8 +12,8 @@ public:
 	AlphaBeta(PlanetWars& pw_, std::ofstream& file_):
 		pw(pw_),
 		file(file_),
-		nodesVisited(0),
-		bestScore(std::numeric_limits<int>::min())
+		bestScore(std::numeric_limits<int>::min()),
+		nodesVisited(0)
 	{
 	}
 
@@ -35,7 +35,6 @@ public:
 
 	private:
 		friend class AlphaBeta;
-		std::ofstream& file;
 
 		// NOTE: All members below are wrt the node-turn, 
 		//       e.g. enemy planets could be OUR planets
@@ -55,6 +54,8 @@ public:
 		int enemyNumShips;			// enemy total amount of ships
 		int myNumShipsBak;
 		int enemyNumShipsBak;
+
+		std::ofstream& file;
 	};
 
 	std::vector<Fleet>& GetOrders(int turn);

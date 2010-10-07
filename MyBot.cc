@@ -35,6 +35,9 @@ void DoTurn(PlanetWars& pw, int turn, std::ofstream& file) {
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
+	(void)argc;
+	(void)argv;
+
 	unsigned int turn = 0;
 	std::ofstream file;
 	std::string filename("-Error323-v");

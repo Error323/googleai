@@ -10,7 +10,7 @@
 Simulator AlphaBeta::sim;
 int       AlphaBeta::turn;
 
-#define LOG2(depth, msg)                      \
+#define LOGD(depth, msg)                      \
 	if (file.good())                          \
 	{                                         \
 		std::stringstream ss;                 \
@@ -26,7 +26,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 	bestScore    = std::numeric_limits<int>::min();
 
 	turn     = t;
-	// NOTE: maxDepth should ALWAYS be unequal
+	// NOTE: maxDepth should ALWAYS be equal
 	maxDepth = (MAX_ROUNDS-turn+1)*2;
 	maxDepth = std::min<int>(maxDepth, 4);
 
@@ -47,15 +47,9 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 		node.ApplySimulation();
 	}
 
-	LOG2(depth, "D("<<depth<<") M("<<node.myNumShips<<") E("<<node.enemyNumShips<<")");
 	if (depth == maxDepth || node.IsTerminal(simulate))
 	{
-		if (maxDepth % 2 != 0)
-		{
-			LOG("ERROR: maxDepth should be an even number - "<<maxDepth);
-		}
-		int score = node.GetScore();
-		return score;
+		return node.GetScore();
 	}
 	
 	std::vector<std::vector<Fleet> > actions = node.GetActions();
