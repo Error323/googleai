@@ -162,7 +162,7 @@ class PlanetWars {
   const Fleet& GetFleet(int fleet_id) const;
 
   // Returns a list of all the planets.
-  std::vector<Planet> Planets() const;
+  std::vector<Planet>& Planets();
 
   // Return a list of all the planets owned by the current player. By
   // convention, the current player is always player number 1.
@@ -180,7 +180,7 @@ class PlanetWars {
   std::vector<Planet> NotMyPlanets() const;
 
   // Return a list of all the fleets.
-  std::vector<Fleet> Fleets() const;
+  std::vector<Fleet>& Fleets();
 
   // Return a list of all the fleets owned by the current player.
   std::vector<Fleet> MyFleets() const;

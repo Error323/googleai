@@ -151,7 +151,7 @@ const Fleet& PlanetWars::GetFleet(int fleet_id) const {
   return fleets_[fleet_id];
 }
 
-std::vector<Planet> PlanetWars::Planets() const {
+std::vector<Planet>& PlanetWars::Planets() {
   /*
   std::vector<Planet> r;
   for (int i = 0; i < planets_.size(); ++i) {
@@ -206,13 +206,15 @@ std::vector<Planet> PlanetWars::NotMyPlanets() const {
   return r;
 }
 
-std::vector<Fleet> PlanetWars::Fleets() const {
+std::vector<Fleet>& PlanetWars::Fleets() {
+/*
   std::vector<Fleet> r;
   for (int i = 0; i < fleets_.size(); ++i) {
     const Fleet& f = fleets_[i];
     r.push_back(f);
   }
-  return r;
+*/
+  return fleets_;
 }
 
 std::vector<Fleet> PlanetWars::MyFleets() const {

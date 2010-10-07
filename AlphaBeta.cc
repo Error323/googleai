@@ -253,11 +253,11 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	gAP = &AP;
 	std::vector<std::vector<Fleet> > actions;
-	sort(APIDX.begin(), APIDX.end(), SortOnGrowthShipRatio);
-	for (unsigned int i = 0, n = APIDX.size(); i < n; i++)
+	sort(NPIDX.begin(), NPIDX.end(), SortOnGrowthShipRatio);
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
-		Planet& target = AP[APIDX[i]];
+		Planet& target = AP[NPIDX[i]];
 		int totalFleet = 0;
 		gTarget = target.PlanetID();
 		sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
