@@ -43,12 +43,14 @@ public:
 		std::vector<Fleet>	orders;	// the action
 		std::vector<Planet> AP;		// all planets
 		std::vector<Fleet>  AF;		// all fleets
-		std::vector<int> NP;		// neutral planets
-		std::vector<int> EP;		// enemy planets
-		std::vector<int> MP;		// my planets
-		std::vector<int> NMP;		// not my planets
-		std::vector<int> EF;		// enemy fleets
-		std::vector<int> MF;		// my fleets
+		std::vector<int> APIDX;		// all planets indices
+		std::vector<int> AFIDX;		// all fleets indices
+		std::vector<int> NPIDX;		// neutral planets indices
+		std::vector<int> EPIDX;		// enemy planets indices
+		std::vector<int> MPIDX;		// my planets indices
+		std::vector<int> NMPIDX;	// not my planets indices
+		std::vector<int> EFIDX;		// enemy fleets indices
+		std::vector<int> MFIDX;		// my fleets indices
 		int myNumShips;				// my total amount of ships
 		int enemyNumShips;			// enemy total amount of ships
 		int myNumShipsBak;

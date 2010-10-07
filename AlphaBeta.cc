@@ -72,7 +72,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	}
 	if (depth == 1)
 	{
-		if (alpha > bestScore)
+		if (beta > bestScore)
 		{
 			bestOrders.clear();
 			std::vector<Fleet>& orders = node.GetOrders();
@@ -80,7 +80,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 			{
 				bestOrders.push_back(orders[i]);
 			}
-			bestScore = alpha;
+			bestScore = beta;
 		}
 	}
 	if (simulate)
@@ -116,21 +116,22 @@ AlphaBeta::Node::Node(bool init, std::vector<Planet>& p, std::vector<Fleet>& f, 
 		switch (p.Owner())
 		{
 			case 0: {
-				NP.push_back(i);
-				NMP.push_back(i); 
+				NPIDX.push_back(i);
+				NMPIDX.push_back(i); 
 			} break;
 
 			case 1: {
-				MP.push_back(i);
+				MPIDX.push_back(i);
 				myNumShips += p.NumShips();
 			} break;
 
 			default: {
-				NMP.push_back(i); 
-				EP.push_back(i);
+				NMPIDX.push_back(i); 
+				EPIDX.push_back(i);
 				enemyNumShips += p.NumShips();
 			} break;
 		}
+		APIDX.push_back(i);
 	}
 
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
@@ -147,14 +148,15 @@ AlphaBeta::Node::Node(bool init, std::vector<Planet>& p, std::vector<Fleet>& f, 
 
 		if (f.Owner() == 1)
 		{
-			MF.push_back(i);
+			MFIDX.push_back(i);
 			myNumShips += f.NumShips();
 		}
 		else
 		{
-			EF.push_back(i);
+			EFIDX.push_back(i);
 			enemyNumShips += f.NumShips();
 		}
+		AFIDX.push_back(i);
 	}
 }
 
@@ -252,17 +254,17 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	gAP = &AP;
 	std::vector<std::vector<Fleet> > actions;
-	sort(NMP.begin(), NMP.end(), SortOnGrowthShipRatio);
-	for (unsigned int i = 0, n = NMP.size(); i < n; i++)
+	sort(NPIDX.begin(), NPIDX.end(), SortOnGrowthShipRatio);
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
-		Planet& target = AP[NMP[i]];
+		Planet& target = AP[NPIDX[i]];
 		int totalFleet = 0;
 		gTarget = target.PlanetID();
-		sort(MP.begin(), MP.end(), SortOnDistanceToTarget);
-		for (unsigned int k = 0, m = MP.size(); k < m; k++)
+		sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int k = 0, m = MPIDX.size(); k < m; k++)
 		{
-			Planet& source = AP[MP[k]];
+			Planet& source = AP[MPIDX[k]];
 			if (source.NumShips() <= 0)
 				continue;
 			const int distance = Distance(target, source);
