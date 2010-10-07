@@ -2,7 +2,7 @@
 std::vector<Planet>* gAP;
 int gTarget;
 
-int Distance(const Planet& a, const Planet& b) {
+inline int Distance(const Planet& a, const Planet& b) {
 	double x = a.X()-b.X();
 	double y = a.Y()-b.Y();
 	return int(ceil(sqrt(x*x + y*y)));

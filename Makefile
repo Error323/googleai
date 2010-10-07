@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-Wall -Wextra
+CFLAGS=-Wall -Wextra -O2
 LDFLAGS=
 
 OBJECTS=MyBot.o PlanetWars.o Simulator.o AlphaBeta.o
