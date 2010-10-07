@@ -10,11 +10,14 @@
 void DoTurn(PlanetWars& pw, int turn, std::ofstream& file) {
 	AlphaBeta ab(pw, file);
 	std::vector<Fleet>& orders = ab.GetOrders(turn);
+	std::vector<Planet> AP     = pw.Planets();
 	
 	for (unsigned int i = 0; i < orders.size(); i++)
 	{
-		Fleet& order = orders[i];
-		if (order.NumShips() > 0)
+		const Fleet& order = orders[i];
+		const Planet& src = AP[order.SourcePlanet()];
+		const Planet& dst = AP[order.DestinationPlanet()];
+		if (order.NumShips() > 0 && src.Owner() == 1 && dst.PlanetID() != src.PlanetID())
 		{
 			pw.IssueOrder(order.SourcePlanet(), 
 				order.DestinationPlanet(), order.NumShips());
@@ -22,6 +25,8 @@ void DoTurn(PlanetWars& pw, int turn, std::ofstream& file) {
 		else
 		{
 			LOG("ERROR: invalid order - " << order);
+			LOG("\tSource: " << src);
+			LOG("\tDest  : " << dst);
 		}
 	}
 }
@@ -49,7 +54,7 @@ int main(int argc, char *argv[]) {
 				LOG("turn: " << turn);
 				//LOG(pw.ToString());
 				DoTurn(pw, turn, file);
-				LOG("--------------------------------------------------------------------------------\n");
+				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;
 				pw.FinishTurn();
 			} 

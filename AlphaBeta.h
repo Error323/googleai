@@ -11,10 +11,10 @@ class AlphaBeta {
 public:
 	AlphaBeta(PlanetWars& pw_, std::ofstream& file_):
 		pw(pw_),
-		file(file_)
+		file(file_),
+		nodesVisited(0),
+		bestScore(std::numeric_limits<int>::min())
 	{
-		bestScore = std::numeric_limits<int>::min();
-		nodesVisited = 0;
 	}
 
 	class Node {
@@ -28,9 +28,10 @@ public:
 		std::vector<Node>                GetChildren();
 		int                              GetScore();
 		bool                             IsTerminal(bool simulate);
-		void                             Simulate();
-		void ApplyAction(bool simulate, std::vector<Fleet>& action);
-		void RestoreAction(bool simulate, std::vector<Fleet>& action);
+		void                             ApplySimulation();
+		void                             RestoreSimulation();
+		void                             AddAction(std::vector<Fleet>& action);
+		void                             RemoveAction(bool,int);
 
 	private:
 		friend class AlphaBeta;
@@ -62,7 +63,7 @@ private:
 	PlanetWars& pw;
 	std::ofstream& file;
 	int bestScore;
-	int turnsRemaining;
+	int maxDepth;
 	int nodesVisited;
 	std::vector<Fleet> bestOrders;
 

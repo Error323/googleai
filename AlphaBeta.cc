@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <cmath>
+#include <cassert>
 
 #define MAX_ROUNDS 200
 
@@ -21,10 +22,12 @@ int       AlphaBeta::turn;
 std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
+	nodesVisited = 0;
 
-	turn           = t;
-	turnsRemaining = MAX_ROUNDS-turn+1;
-	turnsRemaining = std::min<int>(turnsRemaining, 1);
+	turn     = t;
+	// NOTE: maxDepth should ALWAYS be equal
+	maxDepth = (MAX_ROUNDS-turn)*2;
+	maxDepth = std::min<int>(maxDepth, 2);
 
 	Node origin(true, AP, AF, file);
 	int score = Search(origin, 0, std::numeric_limits<int>::min(),
@@ -38,13 +41,12 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 {
 	nodesVisited++;
 	bool simulate = (depth > 0 && depth % 2 == 0);
-	if (simulate)
-	{
-		node.Simulate();
-	}
 
-	if (depth == turnsRemaining || node.IsTerminal(simulate))
+	LOG2(depth, "D("<<depth<<") M("<<node.myNumShips<<") E("<<node.enemyNumShips<<")");
+
+	if (depth == maxDepth || node.IsTerminal(simulate))
 	{
+		assert(depth % 2 == 0);
 		return node.GetScore();
 	}
 	
@@ -52,9 +54,17 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	Node child(false, node.Planets(), node.Fleets(), file);
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
-		child.ApplyAction(simulate, actions[i]);
+		child.AddAction(actions[i]);
+		if (simulate)
+		{
+			child.ApplySimulation();
+		}
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
-		child.RestoreAction(simulate, actions[i]);
+		if (simulate)
+		{
+			child.RestoreSimulation();
+		}
+		child.RemoveAction(simulate, actions[i].size());
 
 		if (beta <= alpha)
 		{
@@ -144,44 +154,52 @@ AlphaBeta::Node::Node(bool init, std::vector<Planet>& p, std::vector<Fleet>& f, 
 	}
 }
 
-void AlphaBeta::Node::ApplyAction(bool simulate, std::vector<Fleet>& action) {
+void AlphaBeta::Node::AddAction(std::vector<Fleet>& action) {
 	for (unsigned int i = 0, n = action.size(); i < n; i++)
 	{
-		Fleet& order = action[i];
+		orders.push_back(action[i]);
+	}
+}
+
+void AlphaBeta::Node::RemoveAction(bool isMe, int size) {
+	if (isMe)
+		orders.erase(orders.begin(), orders.end()-size);
+	else
+		orders.erase(orders.begin()+orders.size()-size, orders.end());
+}
+
+void AlphaBeta::Node::ApplySimulation() {
+	for (unsigned int i = 0, n = orders.size(); i < n; i++)
+	{
+		Fleet& order = orders[i];
 		Planet& src  = AP[order.SourcePlanet()];
 		Planet& dst  = AP[order.DestinationPlanet()];
 		int ships    = order.NumShips();
 		src.Backup();
 		dst.Backup();
 		src.NumShips(src.NumShips()-ships);
-		orders.push_back(order);
 		AF.push_back(order);
 	}
-	// simulation will run, backup the ships
-	if (simulate)
-	{
-		myNumShipsBak    = myNumShips;
-		enemyNumShipsBak = enemyNumShips;
-	}
+	sim.Start(1, AP, AF);
+	myNumShipsBak    = myNumShips;
+	enemyNumShipsBak = enemyNumShips;
+	myNumShips       = sim.MyNumShips();
+	enemyNumShips    = sim.EnemyNumShips();
 }
 
-void AlphaBeta::Node::RestoreAction(bool simulate, std::vector<Fleet>& action) {
-	for (unsigned int i = 0, n = action.size(); i < n; i++)
+void AlphaBeta::Node::RestoreSimulation() {
+	for (unsigned int i = 0, n = orders.size(); i < n; i++)
 	{
-		Fleet& order = action[i];
+		Fleet& order = orders[i];
 		Planet& src  = AP[order.SourcePlanet()];
 		Planet& dst  = AP[order.DestinationPlanet()];
 		src.Restore();
 		dst.Restore();
 	}
+	AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
 	orders.clear();
-	AF.erase(AF.begin()+AF.size()-action.size(), AF.end());
-	// simulation has run, restore the ships
-	if (simulate)
-	{
-		myNumShips    = myNumShipsBak;
-		enemyNumShips = enemyNumShipsBak;
-	}
+	myNumShips    = myNumShipsBak;
+	enemyNumShips = enemyNumShipsBak;
 }
 
 int AlphaBeta::Node::GetScore() {
@@ -195,13 +213,6 @@ bool AlphaBeta::Node::IsTerminal(bool simulate) {
 	else
 		return false;
 }
-
-void AlphaBeta::Node::Simulate() {
-	sim.Start(1, AP, AF);
-	myNumShips    = sim.MyNumShips();
-	enemyNumShips = sim.EnemyNumShips();
-}
-
 
 std::vector<Planet>* gAP;
 int gTarget;
