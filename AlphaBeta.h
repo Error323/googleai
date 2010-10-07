@@ -42,7 +42,7 @@ public:
 		void                             ApplySimulation();
 		void                             RestoreSimulation();
 		void                             AddAction(std::vector<Fleet>& action);
-		void                             RemoveAction(bool,int);
+		void                             RemoveAction(int);
 
 	private:
 		friend class AlphaBeta;

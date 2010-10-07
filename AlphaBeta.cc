@@ -19,8 +19,9 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 
 	turn     = t;
 	// NOTE: maxDepth should ALWAYS be equal
-	maxDepth = (MAX_ROUNDS-turn+1)*2;
-	maxDepth = std::min<int>(maxDepth, 4);
+	maxDepth  = 3;
+	maxDepth *= 2;
+	maxDepth  = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2);
 
 	Node origin(true, AP, AF, file);
 	int score = Search(origin, 0, std::numeric_limits<int>::min(),
@@ -33,7 +34,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 {
 	nodesVisited++;
-	bool simulate = (depth > 0 && depth % 2 == 0);
+	bool simulate = (depth % 2 == 1);
 	if (simulate)
 	{
 		node.ApplySimulation();
@@ -50,22 +51,21 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	{
 		child.AddAction(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
-		if (depth == 0 && alpha > bestScore)
-		{
-			bestOrders.clear();
-			std::vector<Fleet>& orders = child.GetOrders();
-			for (unsigned int i = 0, n = orders.size(); i < n; i++)
-			{
-				bestOrders.push_back(orders[i]);
-			}
-			bestScore = alpha;
-		}
-		child.RemoveAction(simulate, actions[i].size());
-
 		if (beta <= alpha)
 		{
 			break;
 		}
+		if (depth == 0 && alpha > bestScore)
+		{
+			bestOrders.clear();
+			std::vector<Fleet>& orders = child.GetOrders();
+			for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			{
+				bestOrders.push_back(orders[j]);
+			}
+			bestScore = alpha;
+		}
+		child.RemoveAction(actions[i].size());
 	}
 
 	if (simulate)
@@ -152,11 +152,8 @@ void AlphaBeta::Node::AddAction(std::vector<Fleet>& action) {
 	}
 }
 
-void AlphaBeta::Node::RemoveAction(bool isMe, int size) {
-	if (isMe)
-		orders.erase(orders.begin(), orders.end()-size);
-	else
-		orders.erase(orders.begin()+orders.size()-size, orders.end());
+void AlphaBeta::Node::RemoveAction(int size) {
+	orders.erase(orders.begin()+orders.size()-size, orders.end());
 }
 
 void AlphaBeta::Node::ApplySimulation() {
@@ -164,10 +161,8 @@ void AlphaBeta::Node::ApplySimulation() {
 	{
 		Fleet& order = orders[i];
 		Planet& src  = AP[order.SourcePlanet()];
-		Planet& dst  = AP[order.DestinationPlanet()];
 		int ships    = order.NumShips();
 		src.Backup();
-		dst.Backup();
 		src.NumShips(src.NumShips()-ships);
 		AF.push_back(order);
 	}
@@ -183,12 +178,9 @@ void AlphaBeta::Node::RestoreSimulation() {
 	{
 		Fleet& order = orders[i];
 		Planet& src  = AP[order.SourcePlanet()];
-		Planet& dst  = AP[order.DestinationPlanet()];
 		src.Restore();
-		dst.Restore();
 	}
 	AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
-	orders.clear();
 	myNumShips    = myNumShipsBak;
 	enemyNumShips = enemyNumShipsBak;
 }

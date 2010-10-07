@@ -27,6 +27,8 @@ void Simulator::Start(int totalTurns,
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
+		if (f.TurnsRemaining() <= 0)
+			continue;
 
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
 		if (turnsTaken + turnsRemaining > totalTurns)
