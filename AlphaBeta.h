@@ -5,42 +5,56 @@
 #include "Simulator.h"
 
 #include <vector>
+#include <limits>
 
 class AlphaBeta {
 public:
 	AlphaBeta(PlanetWars& pw_, std::ofstream& file_):
 		pw(pw_),
-		file(file_),
-		bestScore(-10000000)
+		file(file_)
 	{
+		bestScore = std::numeric_limits<int>::min();
+		nodesVisited = 0;
 	}
 
 	class Node {
 	public:
-		Node(){}
-		Node(std::vector<Planet>& p, std::vector<Fleet>& f):
-			AP(p),
-			AF(f)
-		{}
+		Node(bool, std::vector<Planet>&, std::vector<Fleet>&, std::ofstream&);
 
 		std::vector<Planet>&             Planets()				{ return AP; }
 		std::vector<Fleet>&              Fleets()				{ return AF; }
 		std::vector<Fleet>&              GetOrders()			{ return orders; }
 		std::vector<std::vector<Fleet> > GetActions();
 		std::vector<Node>                GetChildren();
-		int                              GetScore(bool isMe);
-		bool                             IsTerminal();
+		int                              GetScore();
+		bool                             IsTerminal(bool simulate);
 		void                             Simulate();
-		void ApplyAction(std::vector<Fleet>& action);
-		void RestoreAction(std::vector<Fleet>& action);
+		void ApplyAction(bool simulate, std::vector<Fleet>& action);
+		void RestoreAction(bool simulate, std::vector<Fleet>& action);
 
 	private:
+		friend class AlphaBeta;
+		std::ofstream& file;
+
+		// NOTE: All members below are wrt the node-turn, 
+		//       e.g. enemy planets could be OUR planets
+		//       this depends on the isMe boolean value
 		std::vector<Fleet>	orders;	// the action
 		std::vector<Planet> AP;		// all planets
-		std::vector<Fleet>  AF;     // all fleets
+		std::vector<Fleet>  AF;		// all fleets
+		std::vector<int> NP;		// neutral planets
+		std::vector<int> EP;		// enemy planets
+		std::vector<int> MP;		// my planets
+		std::vector<int> NMP;		// not my planets
+		std::vector<int> EF;		// enemy fleets
+		std::vector<int> MF;		// my fleets
+		int myNumShips;				// my total amount of ships
+		int enemyNumShips;			// enemy total amount of ships
+		int myNumShipsBak;
+		int enemyNumShipsBak;
 	};
 
-	std::vector<Fleet> GetOrders(int turn);
+	std::vector<Fleet>& GetOrders(int turn);
 
 private:
 	int Search(Node& node, int depth, int alpha, int beta);
@@ -49,8 +63,11 @@ private:
 	std::ofstream& file;
 	int bestScore;
 	int turnsRemaining;
+	int nodesVisited;
 	std::vector<Fleet> bestOrders;
-	static std::vector<Node>  stack;
+
+	static Simulator sim;
+	static int turn;
 };
 
 #endif

@@ -69,6 +69,8 @@ class Fleet {
   // Set a new value for turns remaining
   int TurnsRemaining(int new_turns_remaining);
 
+  void Owner(int owner) { owner_ = owner; }
+
   friend std::ostream& operator<<(std::ostream&, const Fleet&);
 
  private:
