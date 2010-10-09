@@ -9,7 +9,7 @@
 
 #define MAX_ROUNDS 200
 
-#define LOGD(depth, msg)                      \
+#define LOGD(msg)                             \
 	if (file.good())                          \
 	{                                         \
 		std::stringstream ss;                 \

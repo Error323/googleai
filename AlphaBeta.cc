@@ -16,7 +16,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 
 	turn     = t;
 	// NOTE: maxDepth should ALWAYS be equal
-	maxDepth  = 3;
+	maxDepth  = 1;
 	maxDepth *= 2;
 	maxDepth  = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2);
 
@@ -36,6 +36,8 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	{
 		node.ApplySimulation();
 	}
+
+	//LOGD(">"<<node.AF.size());
 
 	if (depth == maxDepth || node.IsTerminal(simulate))
 	{
@@ -69,6 +71,8 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	{
 		node.RestoreSimulation();
 	}
+
+	//LOGD("<"<<node.AF.size());
 	return alpha;
 }
 

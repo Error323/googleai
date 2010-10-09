@@ -129,15 +129,15 @@ void Planet::RemoveShips(int amount) {
 }
 
 void Planet::Backup() {
-  stack_owner_[stack_ptr_]     = owner_;
-  stack_num_ships_[stack_ptr_] = num_ships_;
+  stack_owner_[stack_ptr_%MAX_STACK_SIZE]     = owner_;
+  stack_num_ships_[stack_ptr_%MAX_STACK_SIZE] = num_ships_;
   stack_ptr_++;
 }
 
 void Planet::Restore() {
   stack_ptr_--;
-  owner_     = stack_owner_[stack_ptr_];
-  num_ships_ = stack_num_ships_[stack_ptr_];
+  owner_     = stack_owner_[stack_ptr_%MAX_STACK_SIZE];
+  num_ships_ = stack_num_ships_[stack_ptr_%MAX_STACK_SIZE];
 }
 
 PlanetWars::PlanetWars(const std::string& gameState) {
