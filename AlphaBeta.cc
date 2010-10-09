@@ -20,7 +20,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
 	maxDepth *= 2;
 	maxDepth  = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2);
 
-	Node origin(true, AP, AF, file);
+	Node origin(0, AP, AF);
 	int score = Search(origin, 0, std::numeric_limits<int>::min(),
 		std::numeric_limits<int>::max());
 
@@ -45,7 +45,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	}
 	
 	std::vector<std::vector<Fleet> > actions = node.GetActions();
-	Node child(false, node.Planets(), node.Fleets(), file);
+	Node child(depth+1, node.Planets(), node.Fleets());
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
 		child.AddAction(actions[i]);
@@ -57,10 +57,9 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 		if (depth == 0 && alpha > bestScore)
 		{
 			bestOrders.clear();
-			std::vector<Fleet>& orders = child.GetOrders();
-			for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			for (unsigned int j = 0, m = actions[i].size(); j < m; j++)
 			{
-				bestOrders.push_back(orders[j]);
+				bestOrders.push_back(actions[i][j]);
 			}
 			bestScore = alpha;
 		}
@@ -76,10 +75,10 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
 	return alpha;
 }
 
-AlphaBeta::Node::Node(bool init, std::vector<Planet>& p, std::vector<Fleet>& f, std::ofstream& fi):
+AlphaBeta::Node::Node(int d, std::vector<Planet>& p, std::vector<Fleet>& f):
+	depth(d),
 	AP(p),
-	AF(f),
-	file(fi) {
+	AF(f) {
 
 	myNumShips       = 0;
 	enemyNumShips    = 0;
@@ -90,7 +89,7 @@ AlphaBeta::Node::Node(bool init, std::vector<Planet>& p, std::vector<Fleet>& f, 
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
-		if (!init)
+		if (depth>0)
 		{
 			if (p.Owner() == 1)
 				p.Owner(2);
@@ -123,7 +122,7 @@ AlphaBeta::Node::Node(bool init, std::vector<Planet>& p, std::vector<Fleet>& f, 
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
-		if (!init)
+		if (depth>0)
 		{
 			if (f.Owner() == 1)
 				f.Owner(2);
@@ -187,7 +186,7 @@ void AlphaBeta::Node::RestoreSimulation() {
 }
 
 int AlphaBeta::Node::GetScore() {
-	sim.Start(MAX_ROUNDS-turn, AP, AF);
+	sim.Start(MAX_ROUNDS-turn-(depth/2), AP, AF);
 	return sim.GetScore();
 }
 

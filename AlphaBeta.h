@@ -30,7 +30,7 @@ public:
 
 	class Node {
 	public:
-		Node(bool, std::vector<Planet>&, std::vector<Fleet>&, std::ofstream&);
+		Node(int, std::vector<Planet>&, std::vector<Fleet>&);
 
 		std::vector<Planet>&             Planets()				{ return AP; }
 		std::vector<Fleet>&              Fleets()				{ return AF; }
@@ -46,11 +46,12 @@ public:
 
 	private:
 		friend class AlphaBeta;
+		std::vector<Fleet>	orders;	// the action
+		int depth;
 
 		// NOTE: All members below are wrt the node-turn, 
 		//       e.g. enemy planets could be OUR planets
 		//       this depends on the isMe boolean value
-		std::vector<Fleet>	orders;	// the action
 		std::vector<Planet> AP;		// all planets
 		std::vector<Fleet>  AF;		// all fleets
 		std::vector<int> APIDX;		// all planets indices
@@ -65,8 +66,6 @@ public:
 		int enemyNumShips;			// enemy total amount of ships
 		int myNumShipsBak;
 		int enemyNumShipsBak;
-
-		std::ofstream& file;
 	};
 
 	std::vector<Fleet>& GetOrders(int turn);
