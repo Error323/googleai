@@ -1,4 +1,5 @@
 #include "AlphaBeta.h"
+#include "Logger.h"
 
 #include <sstream>
 #include <algorithm>
@@ -112,7 +113,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 		// TODO: Verify if this is correct
 		if (beta <= alpha)
 		{
-			break;
+			//break;
 		}
 
 		if (depth == 0 && alpha > bestScore)
@@ -173,10 +174,20 @@ void AlphaBeta::Node::ApplySimulation() {
 	sim.Start(1, curr.AP, curr.AF);
 	curr.myNumShips = sim.MyNumShips();
 	curr.enemyNumShips = sim.EnemyNumShips();
+	for (unsigned int i = 0; i < curr.AF.size(); i++)
+	{
+		if (curr.AF[i].TurnsRemaining() <= 0)
+			LOGD(">"<<curr.AF[i]);
+	}
 }
 
 void AlphaBeta::Node::RestoreSimulation() {
 	curr = history.back();
+	for (unsigned int i = 0; i < curr.AF.size(); i++)
+	{
+		if (curr.AF[i].TurnsRemaining() <= 0)
+			LOGD(">"<<curr.AF[i]);
+	}
 }
 
 int AlphaBeta::Node::GetScore() {

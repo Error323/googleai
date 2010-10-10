@@ -1,4 +1,5 @@
 #include "Simulator.h"
+#include "Logger.h"
 
 #include <algorithm>
 #include <fstream>
@@ -32,6 +33,7 @@ void Simulator::Start(int totalTurns,
 
 		if (f.TurnsRemaining() <= 0)
 		{
+			LOG("[Simulator] during simulation "<<f);
 			remove.push_back(i);
 			continue;
 		}
@@ -134,7 +136,7 @@ void Simulator::Start(int totalTurns,
 
 	for (unsigned int i = 0, n = remove.size(); i < n; i++)
 	{
-		AF.erase(AF.begin()+remove[i]);
+		AF.erase(AF.begin()+remove[i]-i);
 	}
 
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
@@ -162,7 +164,7 @@ void Simulator::Start(int totalTurns,
 		// Fleet landed on planet...
 		if (f.TurnsRemaining() <= 0)
 		{
-			//assert(false);
+			LOG("[Simulator] after simulation "<<f);
 			continue;
 		}
 

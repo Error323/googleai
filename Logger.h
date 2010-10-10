@@ -77,7 +77,7 @@ class Logger {
 		std::stringstream ds;                 \
 		for (int i = 0; i < depth; i++)       \
 			ds << "\t";                       \
-		LOG(ds.str() << msg << std::endl;);   \
+		LOG(ds.str() << msg);                 \
 	} while (0)
 
 

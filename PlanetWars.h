@@ -9,13 +9,6 @@
 #include <string>
 #include <vector>
 
-#define LOG(msg)                  \
-	if (file.good())              \
-	{                             \
-		file << msg << std::endl; \
-	}
-
-
 // This is a utility class that parses strings.
 class StringUtil {
  public:

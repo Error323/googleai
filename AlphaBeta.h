@@ -9,15 +9,6 @@
 
 #define MAX_ROUNDS 200
 
-#define LOGD(msg)                             \
-	if (file.good())                          \
-	{                                         \
-		std::stringstream ss;                 \
-		for (int i = 0; i < depth; i++)       \
-			ss << "\t";                       \
-		file << ss.str() << msg << std::endl; \
-	}
-
 class GameState {
 public:
 	GameState(){}
@@ -45,9 +36,8 @@ private:
 
 class AlphaBeta {
 public:
-	AlphaBeta(PlanetWars& pw_, std::ofstream& file_):
+	AlphaBeta(PlanetWars& pw_):
 		pw(pw_),
-		file(file_),
 		bestScore(std::numeric_limits<int>::min()),
 		nodesVisited(0)
 	{
@@ -79,7 +69,6 @@ private:
 	int Search(Node& node, int depth, int alpha, int beta);
 
 	PlanetWars& pw;
-	std::ofstream& file;
 	int bestScore;
 	int maxDepth;
 	int nodesVisited;
