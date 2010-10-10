@@ -1,6 +1,7 @@
 #include "PlanetWars.h"
 #include "Simulator.h"
 #include "AlphaBeta.h"
+#include "Logger.h"
 
 #include <iostream>
 #include <fstream>
@@ -10,8 +11,8 @@
 
 #define VERSION "11.0"
 
-void DoTurn(PlanetWars& pw, int turn, int plies, std::ofstream& file) {
-	AlphaBeta ab(pw, file);
+void DoTurn(PlanetWars& pw, int turn, int plies) {
+	AlphaBeta ab(pw);
 	std::vector<Fleet>& orders = ab.GetOrders(turn, plies);
 	std::vector<Planet> AP     = pw.Planets();
 	
@@ -54,13 +55,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	unsigned int turn = 0;
-	std::ofstream file;
-	std::string filename("-Error323-v");
-	filename = argv[0] + filename + VERSION + "-" + playerid + ".txt";
-	file.open(filename.c_str(), std::ios::in|std::ios::trunc);
 	std::string current_line;
 	std::string map_data;
-	LOG(argv[0]<<"-"VERSION<<" initialized");
+	LOG(argv[0]<<"-"<<VERSION<<" initialized");
 	while (true) {
 		int c = std::cin.get();
 		current_line += (char)c;
@@ -72,7 +69,7 @@ int main(int argc, char *argv[]) {
 				map_data = "";
 				LOG("turn: " << turn);
 				//LOG(pw.ToString());
-				DoTurn(pw, turn, plies, file);
+				DoTurn(pw, turn, plies);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;
 				pw.FinishTurn();
@@ -84,9 +81,6 @@ int main(int argc, char *argv[]) {
 			current_line = "";
 		}
 	}
-	if (file.good())
-	{
-		file.close();
-	}
+	Logger::Release();
 	return 0;
 }
