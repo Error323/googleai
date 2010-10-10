@@ -21,17 +21,8 @@ void DoTurn(PlanetWars& pw, int turn, int plies) {
 		const Fleet& order = orders[i];
 		const Planet& src = AP[order.SourcePlanet()];
 		const Planet& dst = AP[order.DestinationPlanet()];
-		if (order.NumShips() > 0 && src.Owner() == 1 && dst.PlanetID() != src.PlanetID())
-		{
-			pw.IssueOrder(order.SourcePlanet(), 
-				order.DestinationPlanet(), order.NumShips());
-		}
-		else
-		{
-			LOG("ERROR: invalid order - " << order);
-			LOG("\tSource: " << src);
-			LOG("\tDest  : " << dst);
-		}
+		ASSERT(order.NumShips() > 0 && src.Owner() == 1 && dst.PlanetID() != src.PlanetID());
+		pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
 	}
 }
 
@@ -82,6 +73,5 @@ int main(int argc, char *argv[]) {
 			current_line = "";
 		}
 	}
-	Logger::Release();
 	return 0;
 }

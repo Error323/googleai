@@ -5,9 +5,6 @@
 
 #include <vector>
 #include <map>
-#include <utility>
-#include <iostream>
-#include <fstream>
 
 class Simulator {
 public:

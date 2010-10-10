@@ -84,10 +84,11 @@ class Logger {
 
 #define LOGD(msg)                             \
 	do {                                      \
-		std::stringstream ds;                 \
+		std::stringstream ss;                 \
 		for (int i = 0; i < depth; i++)       \
-			ds << "\t";                       \
-		LOG(ds.str() << msg);                 \
+			ss << "\t";                       \
+		ss << msg;                            \
+		Logger::Instance()->Log(ss.str());    \
 	} while (0)
 
 #define FORMAT_STRING "***ASSERTION FAILED***\n\n\tfile\t%s\n\tline\t%d\n\tfunc\t%s\n\tcond\t%s\n"
