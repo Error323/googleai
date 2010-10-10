@@ -90,5 +90,20 @@ class Logger {
 		LOG(ds.str() << msg);                 \
 	} while (0)
 
+#define FORMAT_STRING "***ASSERTION FAILED***\n\n\tfile\t%s\n\tline\t%d\n\tfunc\t%s\n\tcond\t%s\n"
+
+#define ASSERT(cond)                                                              \
+	do {                                                                          \
+		if ( !(cond) ) {                                                          \
+			FATAL(FORMAT_STRING, __FILE__, __LINE__, __PRETTY_FUNCTION__, #cond); \
+		}                                                                         \
+	} while (0)
+
+#define FATAL(...)                           \
+	do {                                     \
+		char buffer[2048];                   \
+		snprintf(buffer, 2048, __VA_ARGS__); \
+		LOG(buffer);                         \
+	} while (0)
 
 #endif

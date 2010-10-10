@@ -29,23 +29,23 @@ public:
 		int force;
 	};
 
-	void Start(int, std::vector<Planet>&, std::vector<Fleet>&);
+	void Start(int, std::vector<Planet>&, std::vector<Fleet>&, bool passOn = true);
 	std::vector<PlanetOwner>& GetOwnershipHistory(int i);
 	PlanetOwner& GetFirstEnemyOwner(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
-	bool IsMyPlanet(int i) 			{ return AP_[i].Owner() == 1; }
-	bool IsEnemyPlanet(int i) 		{ return AP_[i].Owner() > 1; }
+	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
+	bool IsEnemyPlanet(int i) 		{ return AP[i].Owner() > 1; }
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }
-	Planet& GetPlanet(int i)		{ return AP_[i]; }
+	Planet& GetPlanet(int i)		{ return AP[i]; }
 
 private:
 	int myNumShips;
 	int enemyNumShips;
-	std::vector<Planet> AP_;
-	std::vector<Fleet>  AF_;
+	std::vector<Planet> AP;
+	std::vector<Fleet>  AF;
 	// <planet, vec<owner, time> >
 	std::map<int, std::vector<PlanetOwner> > ownershipHistory;
 	void ChangeOwner(Planet& p, int owner, int time, int force);
