@@ -14,17 +14,12 @@ bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 
 void Simulator::Start(int totalTurns, 
 					std::vector<Planet>& AP, 
-					std::vector<Fleet>& AF, bool backup) {
+					std::vector<Fleet>& AF) {
 
 	myNumShips = enemyNumShips = 0;
 	ownershipHistory.clear();
 	std::vector<int> skipPlanets;
-
-	if (backup)
-	{
-		AF_.clear();
-		AP_.clear();
-	}
+	std::vector<unsigned int> remove;
 
 	sort(AF.begin(), AF.end(), SortOnPlanetAndTurnsLeft);
 
@@ -33,16 +28,16 @@ void Simulator::Start(int totalTurns,
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
-		if (backup)
-		{
-			AF_.push_back(f);
-			f = AF_.back();
-		}
+		unsigned int index = i;
+
 		if (f.TurnsRemaining() <= 0)
+		{
+			remove.push_back(i);
 			continue;
+		}
 
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
-		if (turnsTaken + turnsRemaining > totalTurns)
+		if ((turnsTaken + turnsRemaining) > totalTurns)
 		{
 			turnsRemaining = totalTurns - turnsTaken;
 		}
@@ -73,15 +68,14 @@ void Simulator::Start(int totalTurns,
 		{
 			Fleet& ff = AF[fleetsWithSameDestAndTurns[j]];
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
+			if (ff.TurnsRemaining() <= 0)
+			{
+				remove.push_back(index + j);
+			}
 		}
 		
 		// Add ship growth for non-neutral planets
 		Planet& p = AP[f.DestinationPlanet()];
-		if (backup)
-		{
-			AP_.push_back(p);
-			p = AP_.back();
-		}
 		if (p.Owner() > 0)
 		{
 			p.AddShips(turnsRemaining*p.GrowthRate());
@@ -138,6 +132,11 @@ void Simulator::Start(int totalTurns,
 		}
 	}
 
+	for (unsigned int i = 0, n = remove.size(); i < n; i++)
+	{
+		AF.erase(AF.begin()+remove[i]);
+	}
+
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
@@ -163,6 +162,7 @@ void Simulator::Start(int totalTurns,
 		// Fleet landed on planet...
 		if (f.TurnsRemaining() <= 0)
 		{
+			//assert(false);
 			continue;
 		}
 

@@ -5,98 +5,20 @@
 #include <cmath>
 #include <cassert>
 
-Simulator AlphaBeta::sim;
-int       AlphaBeta::turn;
-
-std::vector<Fleet>& AlphaBeta::GetOrders(int t) {
-	std::vector<Planet> AP = pw.Planets();
-	std::vector<Fleet>  AF = pw.Fleets();
-	nodesVisited = 0;
-	bestScore    = std::numeric_limits<int>::min();
-
-	turn     = t;
-	// NOTE: maxDepth should ALWAYS be equal
-	maxDepth  = 1;
-	maxDepth *= 2;
-	maxDepth  = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2);
-
-	Node origin(0, AP, AF);
-	int score = Search(origin, 0, std::numeric_limits<int>::min(),
-		std::numeric_limits<int>::max());
-
-	LOG("NODES VISITED: " << nodesVisited << "\tSCORE: " << score);
-	return bestOrders;
-}
-
-int AlphaBeta::Search(Node& node, int depth, int alpha, int beta)
-{
-	nodesVisited++;
-	bool simulate = (depth % 2 == 1);
-	if (simulate)
-	{
-		node.ApplySimulation();
-	}
-
-	//LOGD(">"<<node.AF.size());
-
-	if (depth == maxDepth || node.IsTerminal(simulate))
-	{
-		return node.GetScore();
-	}
-	
-	std::vector<std::vector<Fleet> > actions = node.GetActions();
-	Node child(depth+1, node.Planets(), node.Fleets());
-	for (unsigned int i = 0, n = actions.size(); i < n; i++)
-	{
-		child.AddAction(actions[i]);
-		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
-		if (beta <= alpha)
-		{
-			break;
-		}
-		if (depth == 0 && alpha > bestScore)
-		{
-			bestOrders.clear();
-			for (unsigned int j = 0, m = actions[i].size(); j < m; j++)
-			{
-				bestOrders.push_back(actions[i][j]);
-			}
-			bestScore = alpha;
-		}
-		child.RemoveAction(actions[i].size());
-	}
-
-	if (simulate)
-	{
-		node.RestoreSimulation();
-	}
-
-	//LOGD("<"<<node.AF.size());
-	return alpha;
-}
-
-AlphaBeta::Node::Node(int d, std::vector<Planet>& p, std::vector<Fleet>& f):
-	depth(d),
-	AP(p),
-	AF(f) {
-
-	myNumShips       = 0;
-	enemyNumShips    = 0;
-	myNumShipsBak    = 0;
-	enemyNumShipsBak = 0;
-
+GameState::GameState(int d, std::vector<Planet>& ap, std::vector<Fleet>& af): 
+	AP(ap),
+	AF(af),
+	depth(d) {
 	// switch ownership if not the first node
+	myNumShips = enemyNumShips = 0;
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
-		if (depth>0)
-		{
-			if (p.Owner() == 1)
-				p.Owner(2);
-			else
-			if (p.Owner() == 2)
-				p.Owner(1);
-		}
+		int owner = p.Owner();
+		// at depth = 0, we don't want to swap owner and neutral planets never
+		// swap owner
+		owner = (depth > 0 && owner != 0) ? (owner % 2) + 1 : owner;
+		p.Owner(owner);
 
 		switch (p.Owner())
 		{
@@ -122,14 +44,9 @@ AlphaBeta::Node::Node(int d, std::vector<Planet>& p, std::vector<Fleet>& f):
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
-		if (depth>0)
-		{
-			if (f.Owner() == 1)
-				f.Owner(2);
-			else
-			if (f.Owner() == 2)
-				f.Owner(1);
-		}
+		int owner = f.Owner();
+		owner = (depth > 0) ? (owner % 2) + 1 : owner;
+		f.Owner(owner);
 
 		if (f.Owner() == 1)
 		{
@@ -145,54 +62,137 @@ AlphaBeta::Node::Node(int d, std::vector<Planet>& p, std::vector<Fleet>& f):
 	}
 }
 
-void AlphaBeta::Node::AddAction(std::vector<Fleet>& action) {
-	for (unsigned int i = 0, n = action.size(); i < n; i++)
-	{
-		orders.push_back(action[i]);
-	}
+Simulator AlphaBeta::sim;
+int       AlphaBeta::turn;
+
+std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
+	std::vector<Planet> AP = pw.Planets();
+	std::vector<Fleet>  AF = pw.Fleets();
+	nodesVisited = 0;
+	bestScore    = std::numeric_limits<int>::min();
+	turn         = t;
+
+	maxDepth = plies*2;
+	maxDepth = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2);
+
+	GameState gs(0, AP, AF);
+	std::vector<GameState> history;
+	history.push_back(gs);
+	Node origin(0, history, gs);
+
+	int score = Search(origin, 0, std::numeric_limits<int>::min(),
+		std::numeric_limits<int>::max());
+
+	LOG("NODES VISITED: " << nodesVisited << "\tSCORE: " << score);
+	return bestOrders;
 }
 
-void AlphaBeta::Node::RemoveAction(int size) {
-	orders.erase(orders.begin()+orders.size()-size, orders.end());
+int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
+	nodesVisited++;
+	bool simulate = (depth > 0 && depth % 2 == 0);
+	if (simulate)
+	{
+		node.ApplySimulation();
+	}
+	
+	if (depth == maxDepth || node.IsTerminal(simulate))
+	{
+		int score = node.GetScore();
+		node.RestoreSimulation();
+		return score;
+	}
+	
+	Node child(depth+1, node.history, node.curr);
+	std::vector<std::vector<Fleet> > actions = node.GetActions();
+	for (unsigned int i = 0, n = actions.size(); i < n; i++)
+	{
+		child.AddOrders(actions[i]);
+		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
+
+		// TODO: Verify if this is correct
+		if (beta <= alpha)
+		{
+			break;
+		}
+
+		if (depth == 0 && alpha > bestScore)
+		{
+			bestOrders = actions[i];
+			bestScore = alpha;
+		}
+		
+		child.RemoveOrders();
+	}
+
+	if (simulate)
+	{
+		node.RestoreSimulation();
+	}
+
+	return alpha;
+}
+
+AlphaBeta::Node::Node(int d, std::vector<GameState>& h, GameState& p):
+	depth(d),
+	history(h),
+	prev(p) {
+
+	curr = GameState(depth, prev.AP, prev.AF);
+	history.push_back(curr);
+}
+
+void AlphaBeta::Node::AddOrders(std::vector<Fleet>& action) {
+	curr.orders = action;
+}
+
+void AlphaBeta::Node::RemoveOrders() {
+	curr.orders.clear();
 }
 
 void AlphaBeta::Node::ApplySimulation() {
-	for (unsigned int i = 0, n = orders.size(); i < n; i++)
+	for (unsigned int i = 0, n = prev.orders.size(); i < n; i++)
 	{
-		Fleet& order = orders[i];
-		Planet& src  = AP[order.SourcePlanet()];
-		int ships    = order.NumShips();
-		src.Backup();
-		src.NumShips(src.NumShips()-ships);
-		AF.push_back(order);
+		Fleet& order = prev.orders[i];
+		Planet& src  = curr.AP[order.SourcePlanet()];
+		src.RemoveShips(order.NumShips());
+		int index = curr.AF.size();
+		curr.EFIDX.push_back(index);
+		curr.AFIDX.push_back(index);
+		curr.AF.push_back(order);
 	}
-	sim.Start(1, AP, AF);
-	myNumShipsBak    = myNumShips;
-	enemyNumShipsBak = enemyNumShips;
-	myNumShips       = sim.MyNumShips();
-	enemyNumShips    = sim.EnemyNumShips();
+	for (unsigned int i = 0, n = curr.orders.size(); i < n; i++)
+	{
+		Fleet& order = curr.orders[i];
+		Planet& src  = curr.AP[order.SourcePlanet()];
+		src.RemoveShips(order.NumShips());
+		int index = curr.AF.size();
+		curr.MFIDX.push_back(index);
+		curr.AFIDX.push_back(index);
+		curr.AF.push_back(order);
+	}
+	sim.Start(1, curr.AP, curr.AF);
+	curr.myNumShips = sim.MyNumShips();
+	curr.enemyNumShips = sim.EnemyNumShips();
 }
 
 void AlphaBeta::Node::RestoreSimulation() {
-	for (unsigned int i = 0, n = orders.size(); i < n; i++)
-	{
-		Fleet& order = orders[i];
-		Planet& src  = AP[order.SourcePlanet()];
-		src.Restore();
-	}
-	AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
-	myNumShips    = myNumShipsBak;
-	enemyNumShips = enemyNumShipsBak;
+	curr = history.back();
 }
 
 int AlphaBeta::Node::GetScore() {
-	sim.Start(MAX_ROUNDS-turn-(depth/2), AP, AF);
+	if (curr.enemyNumShips <= 0 && curr.myNumShips > 0)
+		return std::numeric_limits<int>::max();
+
+	if (curr.enemyNumShips <= 0 && curr.enemyNumShips > 0)
+		return std::numeric_limits<int>::min();
+
+	sim.Start(MAX_ROUNDS-turn-(depth/2), curr.AP, curr.AF);
 	return sim.GetScore();
 }
 
-bool AlphaBeta::Node::IsTerminal(bool simulate) {
-	if (simulate)
-		return myNumShips <= 0 || enemyNumShips <= 0;
+bool AlphaBeta::Node::IsTerminal(bool s) {
+	if (s)
+		return curr.myNumShips <= 0 || curr.enemyNumShips <= 0;
 	else
 		return false;
 }
@@ -219,9 +219,9 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 }
 
 bool SortOnDistanceToTarget(const int pidA, const int pidB) {
-	Planet& t      = gAP->at(gTarget);
-	Planet& a      = gAP->at(pidA);
-	Planet& b      = gAP->at(pidB);
+	Planet& t = gAP->at(gTarget);
+	Planet& a = gAP->at(pidA);
+	Planet& b = gAP->at(pidB);
 	int distA = Distance(a, t);
 	int distB = Distance(b, t);
 	return distA < distB;
@@ -229,24 +229,25 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 
 // This function contains all the smart stuff
 std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
-	gAP = &AP;
+	gAP = &curr.AP;
+	int owner = depth % 2 + 1;
 	std::vector<std::vector<Fleet> > actions;
-	sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
-	for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
+	sort(curr.NMPIDX.begin(), curr.NMPIDX.end(), SortOnGrowthShipRatio);
+	for (unsigned int i = 0, n = curr.NMPIDX.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
-		Planet& target = AP[NMPIDX[i]];
+		Planet& target = curr.AP[curr.NMPIDX[i]];
 		int totalFleet = 0;
 		gTarget = target.PlanetID();
-		sort(MPIDX.begin(), MPIDX.end(), SortOnDistanceToTarget);
-		for (unsigned int k = 0, m = MPIDX.size(); k < m; k++)
+		sort(curr.MPIDX.begin(), curr.MPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int k = 0, m = curr.MPIDX.size(); k < m; k++)
 		{
-			Planet& source = AP[MPIDX[k]];
+			Planet& source = curr.AP[curr.MPIDX[k]];
 			if (source.NumShips() <= 0 || target.PlanetID() == source.PlanetID())
 				continue;
 			const int distance = Distance(target, source);
 			int fleetSize = std::min<int>(source.NumShips(), target.NumShips()+1);
-			orders.push_back(Fleet(1, fleetSize, source.PlanetID(),
+			orders.push_back(Fleet(owner, fleetSize, source.PlanetID(),
 				target.PlanetID(), distance, distance));
 			totalFleet += fleetSize;
 			if (totalFleet >= target.NumShips()+1)

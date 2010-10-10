@@ -29,7 +29,7 @@ public:
 		int force;
 	};
 
-	void Start(int, std::vector<Planet>&, std::vector<Fleet>&, bool backup = false);
+	void Start(int, std::vector<Planet>&, std::vector<Fleet>&);
 	std::vector<PlanetOwner>& GetOwnershipHistory(int i);
 	PlanetOwner& GetFirstEnemyOwner(int i);
 

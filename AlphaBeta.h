@@ -18,6 +18,31 @@
 		file << ss.str() << msg << std::endl; \
 	}
 
+class GameState {
+public:
+	GameState(){}
+	GameState(int depth, std::vector<Planet>& ap, std::vector<Fleet>& af);
+	
+	std::vector<Planet> AP;		// all planets
+	std::vector<Fleet>  AF;		// all fleets
+	std::vector<Fleet> orders;	// orders
+
+	std::vector<int> APIDX;		// all planets indices
+	std::vector<int> AFIDX;		// all fleets indices
+	std::vector<int> NPIDX;		// neutral planets indices
+	std::vector<int> EPIDX;		// enemy planets indices
+	std::vector<int> MPIDX;		// my planets indices
+	std::vector<int> NMPIDX;	// not my planets indices
+	std::vector<int> EFIDX;		// enemy fleets indices
+	std::vector<int> MFIDX;		// my fleets indices
+
+	int myNumShips;				// my total amount of ships
+	int enemyNumShips;			// enemy total amount of ships
+
+private:
+	int depth;
+};
+
 class AlphaBeta {
 public:
 	AlphaBeta(PlanetWars& pw_, std::ofstream& file_):
@@ -29,46 +54,26 @@ public:
 	}
 
 	class Node {
+	friend class AlphaBeta;
 	public:
-		Node(int, std::vector<Planet>&, std::vector<Fleet>&);
+		Node(int, std::vector<GameState>&, GameState&);
 
-		std::vector<Planet>&             Planets()				{ return AP; }
-		std::vector<Fleet>&              Fleets()				{ return AF; }
-		std::vector<Fleet>&              GetOrders()			{ return orders; }
-		std::vector<std::vector<Fleet> > GetActions();
-		std::vector<Node>                GetChildren();
-		int                              GetScore();
-		bool                             IsTerminal(bool simulate);
 		void                             ApplySimulation();
 		void                             RestoreSimulation();
-		void                             AddAction(std::vector<Fleet>& action);
-		void                             RemoveAction(int);
+		void                             AddOrders(std::vector<Fleet>& orders);
+		void                             RemoveOrders();
+		int                              GetScore();
+		bool                             IsTerminal(bool s);
+		std::vector<std::vector<Fleet> > GetActions();
 
 	private:
-		friend class AlphaBeta;
-		std::vector<Fleet>	orders;	// the action
 		int depth;
-
-		// NOTE: All members below are wrt the node-turn, 
-		//       e.g. enemy planets could be OUR planets
-		//       this depends on the isMe boolean value
-		std::vector<Planet> AP;		// all planets
-		std::vector<Fleet>  AF;		// all fleets
-		std::vector<int> APIDX;		// all planets indices
-		std::vector<int> AFIDX;		// all fleets indices
-		std::vector<int> NPIDX;		// neutral planets indices
-		std::vector<int> EPIDX;		// enemy planets indices
-		std::vector<int> MPIDX;		// my planets indices
-		std::vector<int> NMPIDX;	// not my planets indices
-		std::vector<int> EFIDX;		// enemy fleets indices
-		std::vector<int> MFIDX;		// my fleets indices
-		int myNumShips;				// my total amount of ships
-		int enemyNumShips;			// enemy total amount of ships
-		int myNumShipsBak;
-		int enemyNumShipsBak;
+		std::vector<GameState> history;
+		GameState& prev;
+		GameState  curr;
 	};
 
-	std::vector<Fleet>& GetOrders(int turn);
+	std::vector<Fleet>& GetOrders(int turn, int plies);
 
 private:
 	int Search(Node& node, int depth, int alpha, int beta);
