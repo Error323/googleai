@@ -39,26 +39,31 @@ class Logger {
 		std::string GetLogName();
 
 		Logger& operator << (const char* s) {
-			log << s;
+			if (isGood) {
+				log << s;
+			}
 			return *this;
 		}
 		template<typename T> Logger& operator << (const T& t) {
-			log << t;
+			if (isGood) {
+				log << t;
+			}
 			return *this;
 		}
 
 		template<typename T> Logger& Log(const T& t, LogLevel lvl = LOG_BASIC) {
-			switch (lvl) {
-				case LOG_BASIC: {
-					log << t; log << std::endl;
-				} break;
-				case LOG_DEBUG: {
-					/* TODO */
-				} break;
-				default: {
-				} break;
+			if (isGood) {
+				switch (lvl) {
+					case LOG_BASIC: {
+						log << t; log << std::endl;
+					} break;
+					case LOG_DEBUG: {
+						/* TODO */
+					} break;
+					default: {
+					} break;
+				}
 			}
-
 			return *this;
 		}
 
@@ -67,6 +72,7 @@ class Logger {
 		std::string dir;
 		std::string name;
 		std::ofstream log;
+		bool isGood;
 };
 
 #define LOG(msg)                              \

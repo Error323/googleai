@@ -7,11 +7,13 @@
 Logger* Logger::instance = NULL;
 
 Logger::Logger(std::string n = "") {
+	isGood = false;
 	if (n.empty())
 		name = GetLogName();
 	else
 		name = n;
 	log.open(name.c_str());
+	isGood = log.good();
 }
 
 std::string Logger::GetLogName() {
