@@ -69,6 +69,16 @@ int Fleet::TurnsRemaining(int new_turns_remaining) {
   return turns_remaining_ = new_turns_remaining;
 }
 
+void Fleet::Backup() {
+  bak_turns_remaining_ = turns_remaining_;
+  bak_num_ships_       = num_ships_;
+}
+
+void Fleet::Restore() {
+  turns_remaining_ = bak_turns_remaining_;
+  num_ships_ = bak_num_ships_;
+}
+
 Planet::Planet(int planet_id,
                int owner,
                int num_ships,
@@ -81,11 +91,6 @@ Planet::Planet(int planet_id,
   growth_rate_ = growth_rate;
   x_ = x;
   y_ = y;
-  stack_ptr_ = 0;
-  stack_owner_.reserve(MAX_STACK_SIZE);
-  stack_owner_.resize(MAX_STACK_SIZE);
-  stack_num_ships_.reserve(MAX_STACK_SIZE);
-  stack_num_ships_.resize(MAX_STACK_SIZE);
 }
 
 int Planet::PlanetID() const {
@@ -129,15 +134,13 @@ void Planet::RemoveShips(int amount) {
 }
 
 void Planet::Backup() {
-  stack_owner_[stack_ptr_%MAX_STACK_SIZE]     = owner_;
-  stack_num_ships_[stack_ptr_%MAX_STACK_SIZE] = num_ships_;
-  stack_ptr_++;
+  bak_owner_     = owner_;
+  bak_num_ships_ = num_ships_;
 }
 
 void Planet::Restore() {
-  stack_ptr_--;
-  owner_     = stack_owner_[stack_ptr_%MAX_STACK_SIZE];
-  num_ships_ = stack_num_ships_[stack_ptr_%MAX_STACK_SIZE];
+  owner_     = bak_owner_;
+  num_ships_ = bak_num_ships_;
 }
 
 PlanetWars::PlanetWars(const std::string& gameState) {

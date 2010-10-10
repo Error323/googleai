@@ -70,10 +70,15 @@ class Fleet {
   int TurnsRemaining(int new_turns_remaining);
 
   void Owner(int owner) { owner_ = owner; }
+  void Backup();
+  void Restore();
 
   friend std::ostream& operator<<(std::ostream&, const Fleet&);
 
  private:
+  int bak_num_ships_;
+  int bak_turns_remaining_;
+
   int owner_;
   int num_ships_;
   int source_planet_;
@@ -129,9 +134,8 @@ class Planet {
   void Restore();
 
  private:
-  std::vector<int> stack_owner_;
-  std::vector<int> stack_num_ships_;
-  int stack_ptr_;
+  int bak_owner_;
+  int bak_num_ships_;
 
   int planet_id_;
   int owner_;
