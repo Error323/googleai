@@ -2,7 +2,7 @@ CC=g++
 CFLAGS=-Wall -Wextra -O2
 LDFLAGS=
 
-OBJECTS=MyBot.o PlanetWars.o Simulator.o AlphaBeta.o
+OBJECTS=MyBot.o Logger.o PlanetWars.o Simulator.o AlphaBeta.o 
 EXECUTABLE=MyBot
 
 $(EXECUTABLE): $(OBJECTS)
