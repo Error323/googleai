@@ -84,7 +84,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	int score = Search(origin, 0, std::numeric_limits<int>::min(),
 		std::numeric_limits<int>::max());
 
-	LOG("NODES VISITED: " << nodesVisited << "\tSCORE: " << score);
+	LOG("NODES VISITED: " << nodesVisited << "\tSCORE: " << score << " MAXDEPTH: " << maxDepth);
 	return bestOrders;
 }
 
@@ -110,10 +110,10 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 		child.AddOrders(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
 
-		// TODO: Verify if this is correct
-		if (beta <= alpha)
+		// TODO: Verify if this is correct, presumably so
+		if (simulate && beta <= alpha)
 		{
-			//break;
+			break;
 		}
 
 		if (depth == 0 && alpha > bestScore)
@@ -174,20 +174,10 @@ void AlphaBeta::Node::ApplySimulation() {
 	sim.Start(1, curr.AP, curr.AF);
 	curr.myNumShips = sim.MyNumShips();
 	curr.enemyNumShips = sim.EnemyNumShips();
-	for (unsigned int i = 0; i < curr.AF.size(); i++)
-	{
-		if (curr.AF[i].TurnsRemaining() <= 0)
-			LOGD(">"<<curr.AF[i]);
-	}
 }
 
 void AlphaBeta::Node::RestoreSimulation() {
 	curr = history.back();
-	for (unsigned int i = 0; i < curr.AF.size(); i++)
-	{
-		if (curr.AF[i].TurnsRemaining() <= 0)
-			LOGD(">"<<curr.AF[i]);
-	}
 }
 
 int AlphaBeta::Node::GetScore() {

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <cassert>
 #include <iostream>
+#include <list>
 
 bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 	if (a.DestinationPlanet() == b.DestinationPlanet())
@@ -20,7 +21,7 @@ void Simulator::Start(int totalTurns,
 	myNumShips = enemyNumShips = 0;
 	ownershipHistory.clear();
 	std::vector<int> skipPlanets;
-	std::vector<unsigned int> remove;
+	std::list<unsigned int> remove;
 
 	sort(AF.begin(), AF.end(), SortOnPlanetAndTurnsLeft);
 
@@ -34,7 +35,7 @@ void Simulator::Start(int totalTurns,
 		if (f.TurnsRemaining() <= 0)
 		{
 			LOG("[Simulator] during simulation "<<f);
-			remove.push_back(i);
+			remove.push_front(i);
 			continue;
 		}
 
@@ -72,7 +73,7 @@ void Simulator::Start(int totalTurns,
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
 			if (ff.TurnsRemaining() <= 0)
 			{
-				remove.push_back(index + j);
+				remove.push_front(index + j);
 			}
 		}
 		
@@ -134,9 +135,9 @@ void Simulator::Start(int totalTurns,
 		}
 	}
 
-	for (unsigned int i = 0, n = remove.size(); i < n; i++)
+	for (std::list<unsigned int>::iterator i = remove.begin(); i != remove.end(); i++)
 	{
-		AF.erase(AF.begin()+remove[i]-i);
+		AF.erase(AF.begin()+(*i));
 	}
 
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
