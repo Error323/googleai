@@ -6,8 +6,11 @@
 
 Logger* Logger::instance = NULL;
 
-Logger::Logger() {
-	name = GetLogName();
+Logger::Logger(std::string n = "") {
+	if (n.empty())
+		name = GetLogName();
+	else
+		name = n;
 	log.open(name.c_str());
 }
 

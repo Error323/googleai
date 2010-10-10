@@ -53,6 +53,8 @@ int main(int argc, char *argv[]) {
 		default: {
 		}
 	}
+	Logger logger(std::string(argv[0]) + "-E323-" + VERSION + "-" + playerid + ".txt");
+	Logger::SetLogger(&logger);
 
 	unsigned int turn = 0;
 	std::string current_line;
@@ -68,7 +70,6 @@ int main(int argc, char *argv[]) {
 				PlanetWars pw(map_data);
 				map_data = "";
 				LOG("turn: " << turn);
-				//LOG(pw.ToString());
 				DoTurn(pw, turn, plies);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;

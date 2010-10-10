@@ -14,7 +14,7 @@ enum LogLevel {
 
 class Logger {
 	public:
-		Logger();
+		Logger(std::string);
 
 		~Logger() {
 			log.flush();
@@ -23,13 +23,17 @@ class Logger {
 
 		static Logger* Instance() {
 			if (instance == NULL)
-				instance = new Logger();
+				instance = new Logger("");
 			return instance;
 		}
 
 		static void Release() {
 			if (instance != NULL)
 				delete instance;
+		}
+
+		static void SetLogger(Logger* logger) {
+			instance = logger;
 		}
 
 		std::string GetLogName();

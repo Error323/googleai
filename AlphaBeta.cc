@@ -110,8 +110,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 		child.AddOrders(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
 
-		// TODO: Verify if this is correct, presumably so
-		if (simulate && beta <= alpha)
+		if (/*simulate &&*/ beta <= alpha)
 		{
 			break;
 		}
