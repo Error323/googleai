@@ -71,12 +71,12 @@ private:
 
 	PlanetWars& pw;
 	int bestScore;
-	int maxDepth;
 	int nodesVisited;
 	std::vector<Fleet> bestOrders;
 
 	static Simulator sim;
 	static int turn;
+	static int maxDepth;
 };
 
 #endif

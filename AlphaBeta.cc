@@ -66,6 +66,7 @@ GameState::GameState(int d, std::vector<Planet>& ap, std::vector<Fleet>& af):
 
 Simulator AlphaBeta::sim;
 int       AlphaBeta::turn;
+int       AlphaBeta::maxDepth;
 
 std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	std::vector<Planet> AP = pw.Planets();
@@ -156,14 +157,14 @@ void AlphaBeta::Node::ApplySimulation() {
 		Fleet& order = prev.orders[i];
 		Planet& src  = curr.AP[order.SourcePlanet()];
 		src.RemoveShips(order.NumShips());
-		ASSERT(order.Owner() == src.Owner());
+		ASSERTD(order.Owner() == src.Owner());
 		curr.AF.push_back(order);
 	}
 	for (unsigned int i = 0, n = curr.orders.size(); i < n; i++)
 	{
 		Fleet& order = curr.orders[i];
 		Planet& src  = curr.AP[order.SourcePlanet()];
-		ASSERT(order.Owner() == src.Owner());
+		ASSERTD(order.Owner() == src.Owner());
 		src.RemoveShips(order.NumShips());
 		curr.AF.push_back(order);
 	}
@@ -183,8 +184,13 @@ int AlphaBeta::Node::GetScore() {
 	if (curr.myNumShips <= 0)
 		return std::numeric_limits<int>::min();
 
-	sim.Start(MAX_ROUNDS-turn-(depth/2)+1, curr.AP, curr.AF);
-	return sim.GetScore();
+	if (depth == maxDepth)
+	{
+		sim.Start(MAX_ROUNDS-turn-(depth/2)+1, curr.AP, curr.AF);
+		return sim.GetScore();
+	}
+
+	return curr.myNumShips - curr.enemyNumShips;
 }
 
 bool AlphaBeta::Node::IsTerminal(bool s) {
@@ -224,48 +230,243 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 	return distA < distB;
 }
 
+bool SortOnGrowthRate(const int pidA, const int pidB) {
+	const Planet& a = gAP->at(pidA);
+	const Planet& b = gAP->at(pidB);
+	return a.GrowthRate() > b.GrowthRate();
+}
+
+void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
+			std::vector<Planet>& AP, std::vector<Fleet>& AF, std::vector<Fleet>& allOrdersForAnAction) {
+	if (success)
+	{
+		for (unsigned int j = 0, m = orders.size(); j < m; j++)
+		{
+			Fleet& order = orders[j];
+			ASSERT(order.NumShips() > 0);
+			allOrdersForAnAction.push_back(order);
+		}
+	}
+	else // restore previous state
+	{
+		AP[target.PlanetID()].Restore();
+		for (unsigned int j = 0, m = orders.size(); j < m; j++)
+		{
+			Fleet& order = orders[j];
+			AP[order.SourcePlanet()].Restore();
+		}
+		AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
+	}
+}
+
 // This function contains all the smart stuff
 std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	std::vector<std::vector<Fleet> > actions;
-	gAP = &curr.AP;
+	std::vector<Planet> AP(curr.AP);
+	std::vector<Fleet>  AF(curr.AF);
+	gAP = &AP;
 	int owner = (depth % 2) + 1;
 	int turnsRemaining = MAX_ROUNDS-turn-(depth/2)+1;
 
-	std::vector<Planet> endAP(curr.AP);
-	std::vector<Fleet> endAF(curr.AF);
 	Simulator end;
-	end.Start(turnsRemaining, endAP, endAF);
+	Simulator tmp;
+	end.Start(turnsRemaining, AP, AF, false, true);
 
+	// ***************DEFAULT ORDERS HERE, THESE WILL BE ADDED TO EVERY ACTION***********
+	std::vector<Fleet> allOrdersForAnAction;
+	std::vector<int> TPIDX, NTPIDX;
+	for (unsigned int i = 0; i < curr.MPIDX.size(); i++)
+	{
+		Planet& planet = AP[curr.MPIDX[i]];
+		ASSERTD(planet.Owner() == 1);
+		if (end.IsMyPlanet(planet.PlanetID()))
+			NTPIDX.push_back(planet.PlanetID());
+		else
+			TPIDX.push_back(planet.PlanetID());
+	}
+
+	// (1) Defense
+	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
+	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[TPIDX[i]];
+		const int tid = target.PlanetID();
+		std::vector<Fleet> orders;
+		LOGD(target<<" will be captured soon");
+		
+		gTarget = tid;
+		bool successfullAttack = false;
+		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+		{
+			Planet& source = AP[NTPIDX[j]];
+			if (source.NumShips() <= 0)
+				continue;
+			source.Backup();
+			int sid = source.PlanetID();
+
+			const int distance = Distance(source, target);
+			sim.Start(distance, AP, AF, false, true);
+			Planet& simSrc = sim.GetPlanet(tid);
+			while (end.IsEnemyPlanet(tid) && source.NumShips() > 0)
+			{
+				Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+				int numShips;
+
+				if (distance < enemy.time)
+				{
+					numShips = enemy.force - (target.NumShips() + enemy.time*target.GrowthRate());
+				}
+				else
+				if (distance > enemy.time)
+				{
+					numShips = simSrc.NumShips() + 1;
+				}
+				else
+				{
+					numShips = enemy.force;
+				}
+
+				// FIXME: This should not happen...
+				if (numShips <= 0) break;
+				numShips = std::min<int>(source.NumShips(), numShips);
+				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
+				AF.push_back(orders.back());
+				source.NumShips(source.NumShips() - numShips);
+				end.Start(turnsRemaining, AP, AF, false, true);
+			}
+			if (end.IsMyPlanet(tid))
+			{
+				successfullAttack = true;
+				break;
+			}
+		}
+		AcceptOrRestore(successfullAttack, target, orders, AP, AF, allOrdersForAnAction);
+	}
+
+	// (2) Snipe
+	std::vector<int> skipNP;
+	for (unsigned int i = 0, n = curr.NPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[curr.NPIDX[i]];
+		int tid = target.PlanetID();
+
+		// This neutral planet will be captured by the enemy
+		if (end.IsEnemyPlanet(tid))
+		{
+			std::vector<Fleet> orders;
+			
+			gTarget = tid;
+			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+			bool successfullAttack = false;
+			sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[NTPIDX[j]];
+				if (source.NumShips() <= 0)
+					continue;
+
+				source.Backup();
+				int sid = source.PlanetID();
+				const int distance = Distance(source, target);
+
+				// if we are too close don't attack
+				if (distance <= enemy.time)
+					break;
+
+				sim.Start(distance, AP, AF, false, true);
+				const int fleetsRequired = sim.GetPlanet(tid).NumShips() + 1;
+				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
+				orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
+				AF.push_back(orders.back());
+				source.NumShips(source.NumShips() - fleetSize);
+
+				// See if given all previous orders, this planet will be ours
+				sim.Start(distance, AP, AF, false, true);
+				if (sim.IsMyPlanet(tid))
+				{
+					skipNP.push_back(tid);
+					successfullAttack = true;
+					break;
+				}
+			}
+			AcceptOrRestore(successfullAttack, target, orders, AP, AF, allOrdersForAnAction);
+		}
+	}
+
+	unsigned int allOrdersForAnActionBeginSize = allOrdersForAnAction.size();
+	unsigned int afBeginSize = AF.size();
+
+	// *************ALPHA BETA ORDERS HERE, THESE ARE DEFINED PER ACTION************
+	// TODO: Determine GOOD target planets
+
+	// also push back just the default orders as a 'null' action
+	// actions.push_back(allOrdersForAnAction);
+
+	end.Start(turnsRemaining, AP, AF, false, true);
 	sort(curr.NMPIDX.begin(), curr.NMPIDX.end(), SortOnGrowthShipRatio);
 	for (unsigned int i = 0, n = curr.NMPIDX.size(); i < n; i++)
 	{
-		std::vector<Fleet> orders;
-		Planet& target = curr.AP[curr.NMPIDX[i]];
-		if (end.IsMyPlanet(target.PlanetID()))
+		Planet& target = AP[curr.NMPIDX[i]];
+		int tid = target.PlanetID();
+		
+		if (end.IsMyPlanet(tid) || find(skipNP.begin(), skipNP.end(), tid) != skipNP.end())
 			continue;
 		
-		std::vector<Planet> AP(curr.AP);
-		std::vector<Fleet> AF(curr.AF);
-		gTarget = target.PlanetID();
+		gTarget = tid;
 		ASSERTD(target.Owner() == 2 || target.Owner() == 0);
-		sort(curr.MPIDX.begin(), curr.MPIDX.end(), SortOnDistanceToTarget);
-		for (unsigned int k = 0, m = curr.MPIDX.size(); k < m; k++)
+		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+		int totalFleetSize = 0;
+		for (unsigned int k = 0, m = NTPIDX.size(); k < m; k++)
 		{
-			Planet& source = AP[curr.MPIDX[k]];
+			Planet& source = AP[NTPIDX[k]];
+			int sid = source.PlanetID();
 			ASSERTD(source.Owner() == 1);
 			if (source.NumShips() <= 0)
 				continue;
+			source.Backup();
 			const int distance = Distance(target, source);
-			int growRate = (target.Owner() == 0) ? 0 : target.GrowthRate()*distance;
-			int fleetSize = std::min<int>(source.NumShips(), target.NumShips()+growRate+1);
-			Fleet order(owner, fleetSize, source.PlanetID(), target.PlanetID(), distance, distance);
-			orders.push_back(order);
+			int fleetsRequired = (target.Owner() == 0) ? 0 : target.GrowthRate()*distance;
+			fleetsRequired = target.NumShips() + fleetsRequired - totalFleetSize + 1;
+			fleetsRequired = fleetsRequired <= 0 ? 1 : fleetsRequired;
+			int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
+			totalFleetSize += fleetSize;
+			ASSERTD(fleetSize > 0);
+			source.NumShips(source.NumShips()-fleetSize);
+			Fleet order(1, fleetSize, sid, tid, distance, distance);
+			allOrdersForAnAction.push_back(order);
 			AF.push_back(order);
-			sim.Start(distance, AP, AF, true, true);
-			if (sim.IsMyPlanet(target.PlanetID()))
+			sim.Start(distance, AP, AF, false, true);
+			if (sim.IsMyPlanet(tid))
 				break;
 		}
-		actions.push_back(orders);
+		actions.push_back(allOrdersForAnAction);
+		// remove orders from this specific action again
+		if (allOrdersForAnAction.size() > allOrdersForAnActionBeginSize)
+		{
+			allOrdersForAnAction.erase(
+				allOrdersForAnAction.begin() + allOrdersForAnActionBeginSize, 
+				allOrdersForAnAction.end()
+			);
+		}
+		ASSERTD(allOrdersForAnAction.size() == allOrdersForAnActionBeginSize);
+
+		for (unsigned int k = afBeginSize; k < AF.size(); k++)
+		{
+			AP[AF[k].SourcePlanet()].Restore();
+		}
+
+		AF.erase(AF.begin() + afBeginSize, AF.end());
+		ASSERTD(AF.size() == afBeginSize);
 	}
+
+	for (unsigned int i = 0; i < actions.size(); i++)
+	{
+		for (unsigned int j = 0; j < actions[i].size(); j++)
+		{
+			actions[i][j].Owner(owner);
+		}
+	}
+
 	return actions;
 }
