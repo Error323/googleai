@@ -177,14 +177,13 @@ void AlphaBeta::Node::RestoreSimulation() {
 }
 
 int AlphaBeta::Node::GetScore() {
-	sim.Start(MAX_ROUNDS-turn-(depth/2), curr.AP, curr.AF);
-
-	if (sim.EnemyNumShips() <= 0)
+	if (curr.enemyNumShips <= 0)
 		return std::numeric_limits<int>::max();
 
-	if (sim.MyNumShips() <= 0)
+	if (curr.myNumShips <= 0)
 		return std::numeric_limits<int>::min();
 
+	sim.Start(MAX_ROUNDS-turn-(depth/2)+1, curr.AP, curr.AF);
 	return sim.GetScore();
 }
 
@@ -232,35 +231,41 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	int owner = (depth % 2) + 1;
 	int turnsRemaining = MAX_ROUNDS-turn-(depth/2)+1;
 
-	sim.Start(turnsRemaining, curr.AP, curr.AF, false);
+	std::vector<Planet> endAP(curr.AP);
+	std::vector<Fleet> endAF(curr.AF);
+	Simulator end;
+	end.Start(turnsRemaining, endAP, endAF);
 
 	sort(curr.NMPIDX.begin(), curr.NMPIDX.end(), SortOnGrowthShipRatio);
 	for (unsigned int i = 0, n = curr.NMPIDX.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
 		Planet& target = curr.AP[curr.NMPIDX[i]];
-		if (sim.IsMyPlanet(target.PlanetID()))
+		if (end.IsMyPlanet(target.PlanetID()))
 			continue;
-		int totalFleet = 0;
+		
+		std::vector<Planet> AP(curr.AP);
+		std::vector<Fleet> AF(curr.AF);
 		gTarget = target.PlanetID();
 		ASSERTD(target.Owner() == 2 || target.Owner() == 0);
 		sort(curr.MPIDX.begin(), curr.MPIDX.end(), SortOnDistanceToTarget);
 		for (unsigned int k = 0, m = curr.MPIDX.size(); k < m; k++)
 		{
-			Planet& source = curr.AP[curr.MPIDX[k]];
+			Planet& source = AP[curr.MPIDX[k]];
 			ASSERTD(source.Owner() == 1);
-			if (source.NumShips() <= 0 || target.PlanetID() == source.PlanetID())
+			if (source.NumShips() <= 0)
 				continue;
 			const int distance = Distance(target, source);
-			int fleetSize = std::min<int>(source.NumShips(), target.NumShips()+1);
-			orders.push_back(Fleet(owner, fleetSize, source.PlanetID(),
-				target.PlanetID(), distance, distance));
-			totalFleet += fleetSize;
-			if (totalFleet >= target.NumShips()+1)
+			int growRate = (target.Owner() == 0) ? 0 : target.GrowthRate()*distance;
+			int fleetSize = std::min<int>(source.NumShips(), target.NumShips()+growRate+1);
+			Fleet order(owner, fleetSize, source.PlanetID(), target.PlanetID(), distance, distance);
+			orders.push_back(order);
+			AF.push_back(order);
+			sim.Start(distance, AP, AF, true, true);
+			if (sim.IsMyPlanet(target.PlanetID()))
 				break;
 		}
-		if (totalFleet >= target.NumShips()+1)
-			actions.push_back(orders);
+		actions.push_back(orders);
 	}
 	return actions;
 }

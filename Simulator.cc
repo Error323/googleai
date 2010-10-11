@@ -14,16 +14,14 @@ bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 void Simulator::Start(int totalTurns, 
 					std::vector<Planet>& ap, 
 					std::vector<Fleet>& af,
-					bool passOn) {
+					bool removeFleets, bool makeCopy) {
 
 	myNumShips = enemyNumShips = 0;
 	ownershipHistory.clear();
 	std::vector<int> skipPlanets;
 	std::list<unsigned int> remove;
 
-	std::vector<Planet>* AP = &ap;
-	std::vector<Fleet>*	 AF = &af;
-	if (!passOn)
+	if (makeCopy)
 	{
 		_AP.resize(ap.size());
 		_AF.resize(af.size());
@@ -31,6 +29,11 @@ void Simulator::Start(int totalTurns,
 		copy(af.begin(), af.end(), _AF.begin());
 		AP = &_AP;
 		AF = &_AF;
+	}
+	else
+	{
+		AP = &ap;
+		AF = &af;
 	}
 
 	sort(AF->begin(), AF->end(), SortOnPlanetAndTurnsLeft);
@@ -42,7 +45,15 @@ void Simulator::Start(int totalTurns,
 		Fleet& f = AF->at(i);
 		unsigned int index = i;
 
-		if (passOn) ASSERT(f.TurnsRemaining() > 0);
+		if (f.TurnsRemaining() <= 0 && removeFleets)
+		{
+			ASSERT(f.TurnsRemaining() > 0);
+		}
+		else
+		if (f.TurnsRemaining() <= 0)
+		{
+			continue;
+		}
 
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
 		if ((turnsTaken + turnsRemaining) > totalTurns)
@@ -141,7 +152,7 @@ void Simulator::Start(int totalTurns,
 	}
 
 	// TODO: Optimize
-	if (passOn)
+	if (removeFleets)
 	{
 		typedef std::list<unsigned int>::iterator Iter;
 		for (Iter i = remove.begin(); i != remove.end(); i++)
@@ -172,7 +183,15 @@ void Simulator::Start(int totalTurns,
 	{
 		Fleet& f = AF->at(i);
 
-		if (passOn) ASSERT(f.TurnsRemaining() > 0);
+		if (f.TurnsRemaining() <= 0 && removeFleets) 
+		{
+			ASSERT(f.TurnsRemaining() > 0);
+		}
+		else
+		if (f.TurnsRemaining() <= 0)
+		{
+			continue;
+		}
 
 		if (f.Owner() == 1)
 		{
