@@ -22,6 +22,8 @@ public:
 	std::vector<int> NPIDX;		// neutral planets indices
 	std::vector<int> EPIDX;		// enemy planets indices
 	std::vector<int> MPIDX;		// my planets indices
+	std::vector<int> TPIDX;		// my planets that are targetted and captured in the future
+	std::vector<int> NTPIDX;	// my planets that are not targetted
 	std::vector<int> NMPIDX;	// not my planets indices
 	std::vector<int> EFIDX;		// enemy fleets indices
 	std::vector<int> MFIDX;		// my fleets indices

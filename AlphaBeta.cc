@@ -12,6 +12,7 @@ GameState::GameState(int d, std::vector<Planet>& ap, std::vector<Fleet>& af):
 
 	// switch ownership if not the first node
 	myNumShips = enemyNumShips = 0;
+	
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
@@ -74,7 +75,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	turn         = t;
 
 	maxDepth = plies*2;
-	maxDepth = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2+1);
+	maxDepth = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2+2);
 
 	GameState gs(0, AP, AF);
 	std::vector<GameState> history;
@@ -227,14 +228,19 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 // This function contains all the smart stuff
 std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	std::vector<std::vector<Fleet> > actions;
-	int owner = (depth % 2) + 1;
-
 	gAP = &curr.AP;
+	int owner = (depth % 2) + 1;
+	int turnsRemaining = MAX_ROUNDS-turn-(depth/2)+1;
+
+	sim.Start(turnsRemaining, curr.AP, curr.AF, false);
+
 	sort(curr.NMPIDX.begin(), curr.NMPIDX.end(), SortOnGrowthShipRatio);
 	for (unsigned int i = 0, n = curr.NMPIDX.size(); i < n; i++)
 	{
 		std::vector<Fleet> orders;
 		Planet& target = curr.AP[curr.NMPIDX[i]];
+		if (sim.IsMyPlanet(target.PlanetID()))
+			continue;
 		int totalFleet = 0;
 		gTarget = target.PlanetID();
 		ASSERTD(target.Owner() == 2 || target.Owner() == 0);

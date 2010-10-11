@@ -21,24 +21,28 @@ void Simulator::Start(int totalTurns,
 	std::vector<int> skipPlanets;
 	std::list<unsigned int> remove;
 
-	std::vector<Planet>& AP = ap;
-	std::vector<Fleet>&	 AF = af;
+	std::vector<Planet>* AP = &ap;
+	std::vector<Fleet>*	 AF = &af;
 	if (!passOn)
 	{
-		AP = this->AP;
-		AF = this->AF;
+		_AP.resize(ap.size());
+		_AF.resize(af.size());
+		copy(ap.begin(), ap.end(), _AP.begin());
+		copy(af.begin(), af.end(), _AF.begin());
+		AP = &_AP;
+		AF = &_AF;
 	}
 
-	sort(AF.begin(), AF.end(), SortOnPlanetAndTurnsLeft);
+	sort(AF->begin(), AF->end(), SortOnPlanetAndTurnsLeft);
 
 	// Begin simulation
 	int turnsTaken = 0;
-	for (unsigned int i = 0, n = AF.size(); i < n; i++)
+	for (unsigned int i = 0, n = AF->size(); i < n; i++)
 	{
-		Fleet& f = AF[i];
+		Fleet& f = AF->at(i);
 		unsigned int index = i;
 
-		ASSERT(f.TurnsRemaining() > 0);
+		if (passOn) ASSERT(f.TurnsRemaining() > 0);
 
 		int turnsRemaining = f.TurnsRemaining() - turnsTaken;
 		if ((turnsTaken + turnsRemaining) > totalTurns)
@@ -56,21 +60,21 @@ void Simulator::Start(int totalTurns,
 		// amount of turns remaining, gather all the forces
 		while (
 			i < n-1 && 
-			AF[i+1].DestinationPlanet() == f.DestinationPlanet() &&
-			AF[i+1].TurnsRemaining() == f.TurnsRemaining()
+			AF->at(i+1).DestinationPlanet() == f.DestinationPlanet() &&
+			AF->at(i+1).TurnsRemaining() == f.TurnsRemaining()
 		)
 		{
 			i++;
 			fleetsWithSameDestAndTurns.push_back(i);
-			if (forces.find(AF[i].Owner()) == forces.end())
+			if (forces.find(AF->at(i).Owner()) == forces.end())
 			{
-				forces[AF[i].Owner()] = 0;
+				forces[AF->at(i).Owner()] = 0;
 			}
-			forces[AF[i].Owner()] += AF[i].NumShips();
+			forces[AF->at(i).Owner()] += AF->at(i).NumShips();
 		}
 		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
 		{
-			Fleet& ff = AF[fleetsWithSameDestAndTurns[j]];
+			Fleet& ff = AF->at(fleetsWithSameDestAndTurns[j]);
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
 			if (ff.TurnsRemaining() <= 0)
 			{
@@ -79,7 +83,7 @@ void Simulator::Start(int totalTurns,
 		}
 		
 		// Add ship growth for non-neutral planets
-		Planet& p = AP[f.DestinationPlanet()];
+		Planet& p = AP->at(f.DestinationPlanet());
 		if (p.Owner() > 0)
 		{
 			p.AddShips(turnsRemaining*p.GrowthRate());
@@ -125,7 +129,7 @@ void Simulator::Start(int totalTurns,
 
 		// This planet has no more fleets, add additional simulation growth and
 		// reset turns taken
-		if (i == n-1 || AF[i+1].DestinationPlanet() != f.DestinationPlanet())
+		if (i == n-1 || AF->at(i+1).DestinationPlanet() != f.DestinationPlanet())
 		{
 			if (turnsTaken < totalTurns)
 			{
@@ -142,13 +146,13 @@ void Simulator::Start(int totalTurns,
 		typedef std::list<unsigned int>::iterator Iter;
 		for (Iter i = remove.begin(); i != remove.end(); i++)
 		{
-			AF.erase(AF.begin()+(*i));
+			AF->erase(AF->begin()+(*i));
 		}
 	}
 
-	for (unsigned int i = 0, n = AP.size(); i < n; i++)
+	for (unsigned int i = 0, n = AP->size(); i < n; i++)
 	{
-		Planet& p = AP[i];
+		Planet& p = AP->at(i);
 		if (p.Owner() != 0 && find(skipPlanets.begin(), skipPlanets.end(), p.PlanetID()) == skipPlanets.end())
 		{
 			p.AddShips(p.GrowthRate()*totalTurns);
@@ -164,11 +168,11 @@ void Simulator::Start(int totalTurns,
 		}
 	}
 
-	for (unsigned int i = 0, n = AF.size(); i < n; i++)
+	for (unsigned int i = 0, n = AF->size(); i < n; i++)
 	{
-		Fleet& f = AF[i];
+		Fleet& f = AF->at(i);
 
-		ASSERT(f.TurnsRemaining() > 0);
+		if (passOn) ASSERT(f.TurnsRemaining() > 0);
 
 		if (f.Owner() == 1)
 		{

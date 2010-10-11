@@ -31,18 +31,18 @@ public:
 	PlanetOwner& GetFirstEnemyOwner(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
-	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
-	bool IsEnemyPlanet(int i) 		{ return AP[i].Owner() > 1; }
+	bool IsMyPlanet(int i) 			{ return _AP[i].Owner() == 1; }
+	bool IsEnemyPlanet(int i) 		{ return _AP[i].Owner() > 1; }
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }
-	Planet& GetPlanet(int i)		{ return AP[i]; }
+	Planet& GetPlanet(int i)		{ return _AP[i]; }
 
 private:
 	int myNumShips;
 	int enemyNumShips;
-	std::vector<Planet> AP;
-	std::vector<Fleet>  AF;
+	std::vector<Planet> _AP;
+	std::vector<Fleet>  _AF;
 	// <planet, vec<owner, time> >
 	std::map<int, std::vector<PlanetOwner> > ownershipHistory;
 	void ChangeOwner(Planet& p, int owner, int time, int force);

@@ -84,6 +84,7 @@ class Fleet {
 // for each planet on the map.
 class Planet {
  public:
+  Planet(){}
   // Initializes a planet.
   Planet(int planet_id,
          int owner,
