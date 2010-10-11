@@ -21,7 +21,7 @@ void DoTurn(PlanetWars& pw, int turn, int plies) {
 		const Fleet& order = orders[i];
 		const Planet& src = AP[order.SourcePlanet()];
 		const Planet& dst = AP[order.DestinationPlanet()];
-		ASSERT(order.NumShips() > 0 && src.Owner() == 1 && dst.PlanetID() != src.PlanetID());
+		ASSERT_MSG(order.NumShips() > 0 && src.Owner() == 1 && dst.PlanetID() != src.PlanetID(), order);
 		pw.IssueOrder(order.SourcePlanet(), order.DestinationPlanet(), order.NumShips());
 	}
 }
