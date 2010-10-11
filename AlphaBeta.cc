@@ -177,6 +177,13 @@ void AlphaBeta::Node::RestoreSimulation() {
 
 int AlphaBeta::Node::GetScore() {
 	sim.Start(MAX_ROUNDS-turn-(depth/2), curr.AP, curr.AF);
+
+	if (sim.EnemyNumShips() <= 0)
+		return std::numeric_limits<int>::max();
+
+	if (sim.MyNumShips() <= 0)
+		return std::numeric_limits<int>::min();
+
 	return sim.GetScore();
 }
 
