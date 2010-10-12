@@ -93,7 +93,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 
 	std::stringstream time;
 	time << " TIME TAKEN: " << diff;
-	if (diff > MAX_TIME)
+	if (diff > thinkTime)
 	{
 		time << " BRANCH REACHED: " << branchIndex;
 	}
@@ -113,7 +113,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 
 int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 	time(&end); diff = difftime(end, start);
-	if (diff > MAX_TIME)
+	if (diff > thinkTime)
 	{
 		return node.GetScore();
 	}
@@ -241,12 +241,6 @@ bool AlphaBeta::Node::IsTerminal(bool s) {
 std::vector<Planet>* gAP;
 int gTarget;
 
-inline int Distance(const Planet& a, const Planet& b) {
-	double x = a.X()-b.X();
-	double y = a.Y()-b.Y();
-	return int(ceil(sqrt(x*x + y*y)));
-}
-
 bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
 	const Planet& b = gAP->at(pidB);
@@ -261,8 +255,8 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 	Planet& t = gAP->at(gTarget);
 	Planet& a = gAP->at(pidA);
 	Planet& b = gAP->at(pidB);
-	int distA = Distance(a, t);
-	int distB = Distance(b, t);
+	int distA = a.Distance(t);
+	int distB = b.Distance(t);
 	return distA < distB;
 }
 
@@ -320,7 +314,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			NTPIDX.push_back(planet.PlanetID());
 		else
 			TPIDX.push_back(planet.PlanetID());
-		myLoc += vec3<double>(planet.X(), 0.0, planet.Y());
+		myLoc += planet.Loc();
 	}
 	myLoc /= (curr.MPIDX.size() > 0) ? curr.MPIDX.size() : 1.0;
 
@@ -328,7 +322,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	{
 		Planet& planet = AP[curr.EPIDX[i]];
 		ASSERTD(planet.Owner() == 2);
-		enemyLoc += vec3<double>(planet.X(), 0.0, planet.Y());
+		enemyLoc += planet.Loc();
 	}
 	enemyLoc /= (curr.EPIDX.size() > 0) ? curr.EPIDX.size() : 1.0;
 	std::vector<int> skipNP;
@@ -353,7 +347,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			source.Backup();
 			int sid = source.PlanetID();
 
-			const int distance = Distance(source, target);
+			const int distance = source.Distance(target);
 			sim.Start(distance, AP, AF, false, true);
 			Planet& simSrc = sim.GetPlanet(tid);
 			while (end.IsEnemyPlanet(tid) && source.NumShips() > 0)
@@ -416,7 +410,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 
 				source.Backup();
 				int sid = source.PlanetID();
-				const int distance = Distance(source, target);
+				const int distance = source.Distance(target);
 
 				// if we are too close don't attack
 				if (distance <= enemy.time)
@@ -462,7 +456,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			continue;
 		}
 
-		vec3<double> loc(target.X(), 0.0, target.Y());
+		const vec3<double>& loc = target.Loc();
 		double myDist = (loc - myLoc).len2D();
 		double enemyDist = (loc - enemyLoc).len2D();
 		//double growShipRatio = target.GrowthRate() / (1.0*target.NumShips() + 1.0);
@@ -490,7 +484,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			if (source.NumShips() <= 0)
 				continue;
 			source.Backup();
-			const int distance = Distance(target, source);
+			const int distance = source.Distance(target);
 			int fleetsRequired = (target.Owner() == 0) ? 0 : target.GrowthRate()*distance;
 			fleetsRequired = target.NumShips() + fleetsRequired - totalFleetSize + 1;
 			fleetsRequired = fleetsRequired <= 0 ? 1 : fleetsRequired;

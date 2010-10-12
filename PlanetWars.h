@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "vec3.h"
+
 // This is a utility class that parses strings.
 class StringUtil {
  public:
@@ -116,6 +118,11 @@ class Planet {
   double X() const;
   double Y() const;
 
+  vec3<double> Loc() const;
+
+  int Distance(const Planet& p) const;
+
+
   // Use the following functions to set the properties of this planet. Note
   // that these functions only affect your program's copy of the game state.
   // You can't steal your opponent's planets just by changing the owner to 1
@@ -136,6 +143,7 @@ class Planet {
   int num_ships_;
   int growth_rate_;
   double x_, y_;
+  vec3<double> location_;
 };
 
 class PlanetWars {

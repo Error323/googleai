@@ -11,8 +11,8 @@
 
 #define VERSION "11.2"
 
-void DoTurn(PlanetWars& pw, int turn, int plies) {
-	AlphaBeta ab(pw);
+void DoTurn(PlanetWars& pw, int turn, int plies, int thinkTime) {
+	AlphaBeta ab(pw, thinkTime);
 	std::vector<Fleet>& orders = ab.GetOrders(turn, plies);
 	std::vector<Planet> AP     = pw.Planets();
 	
@@ -30,16 +30,22 @@ void DoTurn(PlanetWars& pw, int turn, int plies) {
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
-	int plies = 2;
+	int plies     = 2;
+	int thinkTime = 1;
 	std::string playerid("0");
 	switch(argc)
 	{
 		case 2: {
-			playerid = argv[1];
+			playerid  = argv[1];
 		} break;
 		case 3: {
-			playerid = argv[1];
-			plies    = atoi(argv[2]);
+			playerid  = argv[1];
+			plies     = atoi(argv[2]);
+		} break;
+		case 4: {
+			playerid  = argv[1];
+			plies     = atoi(argv[2]);
+			thinkTime = atoi(argv[3]);
 		} break;
 		default: {
 		}
@@ -50,7 +56,9 @@ int main(int argc, char *argv[]) {
 	unsigned int turn = 0;
 	std::string current_line;
 	std::string map_data;
-	LOG(argv[0]<<"-"<<VERSION<<" initialized");
+	LOG(argv[0]<<"-E323-v"<<VERSION<<" initialized");
+	LOG("\tMAX DEPTH: "<<plies*2);
+	LOG("\tMAX THINK: "<<thinkTime<<"\n");
 	while (true) {
 		int c = std::cin.get();
 		current_line += (char)c;
@@ -61,7 +69,7 @@ int main(int argc, char *argv[]) {
 				PlanetWars pw(map_data);
 				map_data = "";
 				LOG("turn: " << turn);
-				DoTurn(pw, turn, plies);
+				DoTurn(pw, turn, plies, thinkTime);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;
 				pw.FinishTurn();

@@ -9,7 +9,6 @@
 #include <ctime>
 
 #define MAX_TURNS 200
-#define MAX_TIME  0.99999
 
 class GameState {
 public:
@@ -39,11 +38,12 @@ private:
 
 class AlphaBeta {
 public:
-	AlphaBeta(PlanetWars& pw_):
+	AlphaBeta(PlanetWars& pw_, int thinkTime_):
 		pw(pw_),
 		bestScore(0),
 		nodesVisited(0)
 	{
+		thinkTime = thinkTime_ - 0.00001;
 	}
 
 	class Node {
@@ -77,6 +77,7 @@ private:
 	std::vector<Fleet> bestOrders;
 
 	time_t start, end;
+	double thinkTime;
 	double diff;
 
 	static Simulator sim;

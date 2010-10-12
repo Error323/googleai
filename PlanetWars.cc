@@ -91,6 +91,9 @@ Planet::Planet(int planet_id,
   growth_rate_ = growth_rate;
   x_ = x;
   y_ = y;
+  location_.x = x;
+  location_.y = 0.0;
+  location_.z = y;
 }
 
 int Planet::PlanetID() const {
@@ -103,6 +106,14 @@ int Planet::Owner() const {
 
 int Planet::NumShips() const {
   return num_ships_;
+}
+
+vec3<double> Planet::Loc() const {
+  return location_;
+}
+
+int Planet::Distance(const Planet& p) const {
+  return int(ceil((p.Loc() - location_).len2D()));
 }
 
 int Planet::GrowthRate() const {
