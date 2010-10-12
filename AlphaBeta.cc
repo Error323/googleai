@@ -1,5 +1,6 @@
 #include "AlphaBeta.h"
 #include "Logger.h"
+#include "vec3.h"
 
 #include <sstream>
 #include <algorithm>
@@ -178,19 +179,14 @@ void AlphaBeta::Node::RestoreSimulation() {
 }
 
 int AlphaBeta::Node::GetScore() {
+	sim.Start(MAX_ROUNDS-turn-(depth/2)+1, curr.AP, curr.AF);
 	if (curr.enemyNumShips <= 0)
 		return std::numeric_limits<int>::max();
 
 	if (curr.myNumShips <= 0)
 		return std::numeric_limits<int>::min();
 
-	if (depth == maxDepth)
-	{
-		sim.Start(MAX_ROUNDS-turn-(depth/2)+1, curr.AP, curr.AF);
-		return sim.GetScore();
-	}
-
-	return curr.myNumShips - curr.enemyNumShips;
+	return sim.GetScore();
 }
 
 bool AlphaBeta::Node::IsTerminal(bool s) {
@@ -268,11 +264,12 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	int owner = (depth % 2) + 1;
 	int turnsRemaining = MAX_ROUNDS-turn-(depth/2)+1;
 
-	Simulator end;
-	Simulator tmp;
-	end.Start(turnsRemaining, AP, AF, false, true);
 
-	// ***************DEFAULT ORDERS HERE, THESE WILL BE ADDED TO EVERY ACTION***********
+	// ***************META STUFF HERE, ENEMY DISTANCE ETC************
+	Simulator end, tmp;
+	end.Start(turnsRemaining, AP, AF, false, true);
+	vec3<double> myLoc(0.0,0.0,0.0);
+	vec3<double> enemyLoc(0.0,0.0,0.0);
 	std::vector<Fleet> allOrdersForAnAction;
 	std::vector<int> TPIDX, NTPIDX;
 	for (unsigned int i = 0; i < curr.MPIDX.size(); i++)
@@ -283,8 +280,20 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			NTPIDX.push_back(planet.PlanetID());
 		else
 			TPIDX.push_back(planet.PlanetID());
+		myLoc += vec3<double>(planet.X(), 0.0, planet.Y());
 	}
+	myLoc /= (curr.MPIDX.size() > 0) ? curr.MPIDX.size() : 1.0;
 
+	for (unsigned int i = 0; i < curr.EPIDX.size(); i++)
+	{
+		Planet& planet = AP[curr.EPIDX[i]];
+		ASSERTD(planet.Owner() == 2);
+		enemyLoc += vec3<double>(planet.X(), 0.0, planet.Y());
+	}
+	enemyLoc /= (curr.EPIDX.size() > 0) ? curr.EPIDX.size() : 1.0;
+	std::vector<int> skipNP;
+
+	// ***************DEFAULT ORDERS HERE, THESE WILL BE ADDED TO EVERY ACTION***********
 	// (1) Defense
 	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
@@ -292,7 +301,6 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		Planet& target = AP[TPIDX[i]];
 		const int tid = target.PlanetID();
 		std::vector<Fleet> orders;
-		LOGD(target<<" will be captured soon");
 		
 		gTarget = tid;
 		bool successfullAttack = false;
@@ -337,6 +345,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			}
 			if (end.IsMyPlanet(tid))
 			{
+				ASSERTD(target.Owner() == 1);
 				successfullAttack = true;
 				break;
 			}
@@ -345,7 +354,6 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	}
 
 	// (2) Snipe
-	std::vector<int> skipNP;
 	for (unsigned int i = 0, n = curr.NPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[curr.NPIDX[i]];
@@ -386,6 +394,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 				if (sim.IsMyPlanet(tid))
 				{
 					skipNP.push_back(tid);
+					ASSERTD(target.Owner() == 0);
 					successfullAttack = true;
 					break;
 				}
@@ -396,32 +405,48 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 
 	unsigned int allOrdersForAnActionBeginSize = allOrdersForAnAction.size();
 	unsigned int afBeginSize = AF.size();
+	
 
 	// *************ALPHA BETA ORDERS HERE, THESE ARE DEFINED PER ACTION************
 	// TODO: Determine GOOD target planets
-
-	// also push back just the default orders as a 'null' action
-	// actions.push_back(allOrdersForAnAction);
-
 	end.Start(turnsRemaining, AP, AF, false, true);
-	sort(curr.NMPIDX.begin(), curr.NMPIDX.end(), SortOnGrowthShipRatio);
+	std::vector<int> ABT; // Alpha Beta targets to choose from
+
 	for (unsigned int i = 0, n = curr.NMPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[curr.NMPIDX[i]];
 		int tid = target.PlanetID();
-		
+
 		if (end.IsMyPlanet(tid) || find(skipNP.begin(), skipNP.end(), tid) != skipNP.end())
+		{
 			continue;
+		}
+
+		vec3<double> loc(target.X(), 0.0, target.Y());
+		double myDist = (loc - myLoc).len2D();
+		double enemyDist = (loc - enemyLoc).len2D();
+		//double growShipRatio = target.GrowthRate() / (1.0*target.NumShips() + 1.0);
+		if (enemyDist - myDist > 1.0 || target.Owner() == 2)
+		{
+			ABT.push_back(tid);
+		}
+	}
+
+	sort(ABT.begin(), ABT.end(), SortOnGrowthShipRatio);
+	for (unsigned int i = 0, n = ABT.size(); i < n; i++)
+	{
+		Planet& target = AP[ABT[i]];
+		int tid = target.PlanetID();
 		
 		gTarget = tid;
-		ASSERTD(target.Owner() == 2 || target.Owner() == 0);
+		ASSERTD(curr.AP[tid].Owner() == 2 || curr.AP[tid].Owner() == 0);
 		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
 		int totalFleetSize = 0;
 		for (unsigned int k = 0, m = NTPIDX.size(); k < m; k++)
 		{
 			Planet& source = AP[NTPIDX[k]];
 			int sid = source.PlanetID();
-			ASSERTD(source.Owner() == 1);
+			ASSERTD(curr.AP[sid].Owner() == 1);
 			if (source.NumShips() <= 0)
 				continue;
 			source.Backup();
@@ -459,6 +484,8 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		AF.erase(AF.begin() + afBeginSize, AF.end());
 		ASSERTD(AF.size() == afBeginSize);
 	}
+	// also push back just the default orders as a 'null' action
+	actions.push_back(allOrdersForAnAction);
 
 	for (unsigned int i = 0; i < actions.size(); i++)
 	{
