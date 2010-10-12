@@ -75,6 +75,7 @@ class Logger {
 		bool isGood;
 };
 
+#ifdef DEBUG
 #define LOG(msg)                              \
 	do {                                      \
 		std::stringstream ss;                 \
@@ -122,5 +123,16 @@ class Logger {
 		snprintf(buffer, 2048, __VA_ARGS__); \
 		LOG(buffer);                         \
 	} while (0)
+
+#endif
+
+#ifndef DEBUG // NOT DEBUG
+	#define LOG(msg)
+	#define LOGD(msg)
+	#define ASSERT(cond)
+	#define ASSERT_MSG(cond, msg)
+	#define ASSERTD(cond)
+	#define FATAL(...)
+#endif // DEBUG
 
 #endif
