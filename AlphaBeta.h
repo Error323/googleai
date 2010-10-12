@@ -79,6 +79,8 @@ private:
 	static Simulator sim;
 	static int turn;
 	static int maxDepth;
+	static int branchIndex, allBranchIndices;
+	double diff;
 
 	time_t start, end;
 };

@@ -68,6 +68,8 @@ GameState::GameState(int d, std::vector<Planet>& ap, std::vector<Fleet>& af):
 Simulator AlphaBeta::sim;
 int       AlphaBeta::turn;
 int       AlphaBeta::maxDepth;
+int       AlphaBeta::branchIndex = -1;
+int       AlphaBeta::allBranchIndices = -1;
 
 std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	time(&start);
@@ -93,11 +95,10 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 }
 
 int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
-	time(&end);
-	if (difftime(end, start) > MAX_TIME)
+	time(&end); diff = difftime(end, start);
+	if (diff > MAX_TIME)
 	{
-		LOGD("TIME UP: "<<difftime(end, start));
-		return -1;
+		return alpha;
 	}
 
 	nodesVisited++;
@@ -119,6 +120,12 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 	std::vector<std::vector<Fleet> > actions = child.GetActions();
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
+		if (depth == 0)
+		{
+			branchIndex = i;
+			allBranchIndices = actions.size();
+		}
+
 		child.AddOrders(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
 		child.RemoveOrders();
@@ -138,6 +145,11 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 	if (simulate)
 	{
 		node.RestoreSimulation();
+	}
+
+	if (diff > MAX_TIME && depth == 0)
+	{
+		LOG("TIME UP: reached toplevel branch "<<branchIndex<<"/"<<allBranchIndices);
 	}
 
 	return alpha;

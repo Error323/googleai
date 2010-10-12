@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-//#define DEBUG
+#define DEBUG
 
 enum LogLevel {
 	LOG_BASIC,
