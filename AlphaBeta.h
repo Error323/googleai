@@ -41,7 +41,7 @@ class AlphaBeta {
 public:
 	AlphaBeta(PlanetWars& pw_):
 		pw(pw_),
-		bestScore(std::numeric_limits<int>::min()),
+		bestScore(0),
 		nodesVisited(0)
 	{
 	}

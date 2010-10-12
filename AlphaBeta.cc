@@ -126,7 +126,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 		node.ApplySimulation();
 	}
 
-	if (depth == maxDepth || node.IsTerminal(simulate))
+	if (depth >= maxDepth || node.IsTerminal(simulate))
 	{
 		int score = node.GetScore();
 		node.RestoreSimulation();
@@ -135,34 +135,29 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 
 	Node child(depth+1, node.history, node.curr);
 	std::vector<std::vector<Fleet> > actions = child.GetActions();
-	unsigned int index = 0;
+	allBranchIndices = actions.size()-1;
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
-		index = i;
-
 		child.AddOrders(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
 		child.RemoveOrders();
+
+		if (depth == 0)
+		{
+			branchIndex = i;
+			if (alpha > bestScore)
+			{
+				bestBranchIndex = i;
+				bestOrders = actions[i];
+				bestScore = alpha;
+			}
+		}
 
 		if (beta <= alpha)
 		{
 			break;
 		}
 	}
-
-	if (depth == 0)
-	{
-		branchIndex = index;
-		allBranchIndices = actions.size()-1;
-		if (alpha > bestScore)
-		{
-			LOGD("<"<<alpha<<","<<beta);
-			bestBranchIndex = index;
-			bestOrders = actions[index];
-			bestScore = alpha;
-		}
-	}
-
 
 	if (simulate)
 	{
@@ -530,7 +525,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		ASSERTD(AF.size() == afBeginSize);
 	}
 	// also push back just the default orders as a 'null' action
-	//actions.push_back(allOrdersForAnAction);
+	actions.push_back(allOrdersForAnAction);
 
 	for (unsigned int i = 0; i < actions.size(); i++)
 	{
