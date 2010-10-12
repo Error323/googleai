@@ -9,7 +9,7 @@
 
 #include <cstdlib>
 
-#define VERSION "11.0"
+#define VERSION "11.1"
 
 void DoTurn(PlanetWars& pw, int turn, int plies) {
 	AlphaBeta ab(pw);
