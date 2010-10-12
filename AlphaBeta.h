@@ -6,8 +6,10 @@
 
 #include <vector>
 #include <limits>
+#include <ctime>
 
-#define MAX_ROUNDS 200
+#define MAX_TURNS 200
+#define MAX_TIME  0.99999
 
 class GameState {
 public:
@@ -77,6 +79,8 @@ private:
 	static Simulator sim;
 	static int turn;
 	static int maxDepth;
+
+	time_t start, end;
 };
 
 #endif

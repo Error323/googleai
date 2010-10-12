@@ -70,6 +70,7 @@ int       AlphaBeta::turn;
 int       AlphaBeta::maxDepth;
 
 std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
+	time(&start);
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
 	nodesVisited = 0;
@@ -77,7 +78,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	turn         = t;
 
 	maxDepth = plies*2;
-	maxDepth = std::min<int>(maxDepth, (MAX_ROUNDS-turn)*2+2);
+	maxDepth = std::min<int>(maxDepth, (MAX_TURNS-turn)*2+2);
 
 	GameState gs(0, AP, AF);
 	std::vector<GameState> history;
@@ -92,6 +93,13 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 }
 
 int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
+	time(&end);
+	if (difftime(end, start) > MAX_TIME)
+	{
+		LOGD("TIME UP: "<<difftime(end, start));
+		return -1;
+	}
+
 	nodesVisited++;
 	bool simulate = (depth > 0 && depth % 2 == 0);
 	
@@ -179,7 +187,7 @@ void AlphaBeta::Node::RestoreSimulation() {
 }
 
 int AlphaBeta::Node::GetScore() {
-	sim.Start(MAX_ROUNDS-turn-(depth/2)+1, curr.AP, curr.AF);
+	sim.Start(MAX_TURNS-turn-(depth/2)+1, curr.AP, curr.AF);
 	if (curr.enemyNumShips <= 0)
 		return std::numeric_limits<int>::max();
 
@@ -262,7 +270,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	std::vector<Fleet>  AF(curr.AF);
 	gAP = &AP;
 	int owner = (depth % 2) + 1;
-	int turnsRemaining = MAX_ROUNDS-turn-(depth/2)+1;
+	int turnsRemaining = MAX_TURNS-turn-(depth/2)+1;
 
 
 	// ***************META STUFF HERE, ENEMY DISTANCE ETC************
