@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 
+#define SIMULATION_STEPS 1 
+
 GameState::GameState(int d, std::vector<Planet>& ap, std::vector<Fleet>& af): 
 	AP(ap),
 	AF(af),
@@ -73,7 +75,7 @@ int       AlphaBeta::allBranchIndices = -1;
 int       AlphaBeta::bestBranchIndex = -1;
 
 std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
-	time(&start);
+	time(&startTime);
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
 	nodesVisited = 0;
@@ -88,12 +90,12 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	history.push_back(gs);
 	Node origin(0, history, gs);
 
-	int score = Search(origin, 0, std::numeric_limits<int>::min(),
+	Search(origin, 0, std::numeric_limits<int>::min(),
 		std::numeric_limits<int>::max());
 
 	std::stringstream time;
-	time << " TIME TAKEN: " << diff;
-	if (diff > thinkTime)
+	time << " TIME TAKEN: " << diffTime;
+	if (diffTime > thinkTime)
 	{
 		time << " BRANCH REACHED: " << branchIndex;
 	}
@@ -101,7 +103,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	LOG("NODES VISITED: " 
 		<< nodesVisited 
 		<< " SCORE: " 
-		<< score
+		<< bestScore
 		<< " BEST BRANCH: "
 		<< bestBranchIndex
 		<< "/"
@@ -112,8 +114,8 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 }
 
 int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
-	time(&end); diff = difftime(end, start);
-	if (diff > thinkTime)
+	time(&endTime); diffTime = difftime(endTime, startTime);
+	if (diffTime > thinkTime)
 	{
 		return node.GetScore();
 	}
@@ -135,7 +137,6 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 
 	Node child(depth+1, node.history, node.curr);
 	std::vector<std::vector<Fleet> > actions = child.GetActions();
-	allBranchIndices = actions.size()-1;
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
 		child.AddOrders(actions[i]);
@@ -158,6 +159,8 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 			break;
 		}
 	}
+
+	allBranchIndices = actions.size();
 
 	if (simulate)
 	{
@@ -201,7 +204,7 @@ void AlphaBeta::Node::ApplySimulation() {
 		src.RemoveShips(order.NumShips());
 		curr.AF.push_back(order);
 	}
-	sim.Start(1, curr.AP, curr.AF);
+	sim.Start(SIMULATION_STEPS, curr.AP, curr.AF);
 	curr.myNumShips = sim.MyNumShips();
 	curr.enemyNumShips = sim.EnemyNumShips();
 }
@@ -229,11 +232,13 @@ int AlphaBeta::Node::GetScore() {
 	return score;
 }
 
-bool AlphaBeta::Node::IsTerminal(bool s) {
-	if (s)
-		return curr.myNumShips <= 0 || curr.enemyNumShips <= 0;
-	else
-		return false;
+bool AlphaBeta::Node::IsTerminal(bool simulate) {
+	bool isTerminal = false;
+	if (simulate)
+	{
+		isTerminal = curr.myNumShips <= 0 || curr.enemyNumShips <= 0;
+	}
+	return isTerminal;
 }
 
 // Everything below this line is for gathering good actions
@@ -306,18 +311,8 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 	vec3<double> enemyLoc(0.0,0.0,0.0);
 	std::vector<Fleet> allOrdersForAnAction;
 	std::vector<int> TPIDX, NTPIDX;
-	for (unsigned int i = 0; i < curr.MPIDX.size(); i++)
-	{
-		Planet& planet = AP[curr.MPIDX[i]];
-		ASSERTD(planet.Owner() == 1);
-		if (end.IsMyPlanet(planet.PlanetID()))
-			NTPIDX.push_back(planet.PlanetID());
-		else
-			TPIDX.push_back(planet.PlanetID());
-		myLoc += planet.Loc();
-	}
-	myLoc /= (curr.MPIDX.size() > 0) ? curr.MPIDX.size() : 1.0;
 
+	// Determine average enemy location
 	for (unsigned int i = 0; i < curr.EPIDX.size(); i++)
 	{
 		Planet& planet = AP[curr.EPIDX[i]];
@@ -325,6 +320,37 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		enemyLoc += planet.Loc();
 	}
 	enemyLoc /= (curr.EPIDX.size() > 0) ? curr.EPIDX.size() : 1.0;
+
+	int closestPlanetID = -1;
+	int closestDist     = std::numeric_limits<int>::max();
+	// Determine our closest planet and our average location
+	for (unsigned int i = 0; i < curr.MPIDX.size(); i++)
+	{
+		Planet& planet = AP[curr.MPIDX[i]];
+		const int pid  = planet.PlanetID();
+		int dist = (planet.Loc() - enemyLoc).len2D();
+		if (dist < closestDist)
+		{
+			closestPlanetID = pid;
+			closestDist = dist;
+		}
+		myLoc += planet.Loc();
+	}
+	myLoc /= (curr.MPIDX.size() > 0) ? curr.MPIDX.size() : 1.0;
+
+	// Split up planets that will be captured and that will not
+	for (unsigned int i = 0; i < curr.MPIDX.size(); i++)
+	{
+		Planet& planet = AP[curr.MPIDX[i]];
+		const int pid  = planet.PlanetID();
+		
+		ASSERTD(planet.Owner() == 1);
+		if (end.IsMyPlanet(pid) || pid == closestPlanetID)
+			NTPIDX.push_back(pid);
+		else
+			TPIDX.push_back(pid);
+	}
+
 	std::vector<int> skipNP;
 
 	// ***************DEFAULT ORDERS HERE, THESE WILL BE ADDED TO EVERY ACTION***********
@@ -337,7 +363,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		std::vector<Fleet> orders;
 		
 		gTarget = tid;
-		bool successfullAttack = false;
+		bool successfullDefend = false;
 		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
 		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 		{
@@ -370,7 +396,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 				}
 
 				// FIXME: This should not happen...
-				if (numShips <= 0) break;
+				if (numShips <= 0) numShips = 1;
 				numShips = std::min<int>(source.NumShips(), numShips);
 				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
 				AF.push_back(orders.back());
@@ -380,11 +406,11 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			if (end.IsMyPlanet(tid))
 			{
 				ASSERTD(target.Owner() == 1);
-				successfullAttack = true;
+				successfullDefend = true;
 				break;
 			}
 		}
-		AcceptOrRestore(successfullAttack, target, orders, AP, AF, allOrdersForAnAction);
+		AcceptOrRestore(successfullDefend, target, orders, AP, AF, allOrdersForAnAction);
 	}
 
 	// (2) Snipe
@@ -412,9 +438,12 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 				int sid = source.PlanetID();
 				const int distance = source.Distance(target);
 
-				// if we are too close don't attack
-				if (distance <= enemy.time)
+				// if we are too close or too far don't attack
+				if ((distance - enemy.time) > 2)
 					break;
+
+				if (distance < enemy.time)
+					continue;
 
 				sim.Start(distance, AP, AF, false, true);
 				const int fleetsRequired = sim.GetPlanet(tid).NumShips() + 1;
@@ -437,10 +466,27 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		}
 	}
 
+	// (3) Enforce
+	if (closestPlanetID != -1 && TPIDX.empty())
+	{
+		for (unsigned int i = 0; i < NTPIDX.size(); i++)
+		{
+			Planet& source = AP[NTPIDX[i]];
+			if (source.PlanetID() == closestPlanetID || source.NumShips() <= 0)
+				continue;
+			const int distance = source.Distance(AP[closestPlanetID]);
+			const int fleetSize = source.NumShips();
+			Fleet order(1, fleetSize, source.PlanetID(), closestPlanetID, distance, distance);
+			source.NumShips(source.NumShips() - fleetSize);
+			allOrdersForAnAction.push_back(order);
+			AF.push_back(order);
+		}
+	}
+
+
 	unsigned int allOrdersForAnActionBeginSize = allOrdersForAnAction.size();
 	unsigned int afBeginSize = AF.size();
 	
-
 	// *************ALPHA BETA ORDERS HERE, THESE ARE DEFINED PER ACTION************
 	// TODO: Determine GOOD target planets
 	end.Start(turnsRemaining, AP, AF, false, true);
@@ -456,11 +502,11 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			continue;
 		}
 
+		// This enables a "creeping" behavior
 		const vec3<double>& loc = target.Loc();
 		double myDist = (loc - myLoc).len2D();
 		double enemyDist = (loc - enemyLoc).len2D();
-		//double growShipRatio = target.GrowthRate() / (1.0*target.NumShips() + 1.0);
-		if (enemyDist - myDist > 1.0 || target.Owner() == 2)
+		if (enemyDist - myDist > 1.0 || target.Owner() == 2 || curr.myNumShips > curr.enemyNumShips*2)
 		{
 			ABT.push_back(tid);
 		}
@@ -475,7 +521,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		gTarget = tid;
 		ASSERTD(curr.AP[tid].Owner() == 2 || curr.AP[tid].Owner() == 0);
 		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
-		int totalFleetSize = 0;
+		bool successfullAttack = false;
 		for (unsigned int k = 0, m = NTPIDX.size(); k < m; k++)
 		{
 			Planet& source = AP[NTPIDX[k]];
@@ -484,32 +530,40 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 			if (source.NumShips() <= 0)
 				continue;
 			source.Backup();
+
 			const int distance = source.Distance(target);
-			int fleetsRequired = (target.Owner() == 0) ? 0 : target.GrowthRate()*distance;
-			fleetsRequired = target.NumShips() + fleetsRequired - totalFleetSize + 1;
-			fleetsRequired = fleetsRequired <= 0 ? 1 : fleetsRequired;
-			int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
-			totalFleetSize += fleetSize;
+			sim.Start(distance, AP, AF, false, true);
+
+			const int fleetsRequired = sim.GetPlanet(tid).NumShips() + 1;
+			const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
 			ASSERTD(fleetSize > 0);
+
 			source.NumShips(source.NumShips()-fleetSize);
 			Fleet order(1, fleetSize, sid, tid, distance, distance);
 			allOrdersForAnAction.push_back(order);
 			AF.push_back(order);
+
 			sim.Start(distance, AP, AF, false, true);
 			if (sim.IsMyPlanet(tid))
+			{
+				successfullAttack = true;
 				break;
+			}
 		}
-		actions.push_back(allOrdersForAnAction);
-		// remove orders from this specific action again
-		if (allOrdersForAnAction.size() > allOrdersForAnActionBeginSize)
+
+		if (successfullAttack)
 		{
-			allOrdersForAnAction.erase(
-				allOrdersForAnAction.begin() + allOrdersForAnActionBeginSize, 
-				allOrdersForAnAction.end()
-			);
+			actions.push_back(allOrdersForAnAction);
 		}
+
+		// remove orders from this specific action again
+		allOrdersForAnAction.erase(
+			allOrdersForAnAction.begin() + allOrdersForAnActionBeginSize, 
+			allOrdersForAnAction.end()
+		);
 		ASSERTD(allOrdersForAnAction.size() == allOrdersForAnActionBeginSize);
 
+		// Restore souce planets we altered and remove orders from ALL FLEETS again
 		for (unsigned int k = afBeginSize; k < AF.size(); k++)
 		{
 			AP[AF[k].SourcePlanet()].Restore();
@@ -518,9 +572,11 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		AF.erase(AF.begin() + afBeginSize, AF.end());
 		ASSERTD(AF.size() == afBeginSize);
 	}
-	// also push back just the default orders as a 'null' action
+
+	// Add null action
 	actions.push_back(allOrdersForAnAction);
 
+	// set owner to real ingame owner
 	for (unsigned int i = 0; i < actions.size(); i++)
 	{
 		for (unsigned int j = 0; j < actions[i].size(); j++)

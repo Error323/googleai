@@ -76,9 +76,9 @@ private:
 	int nodesVisited;
 	std::vector<Fleet> bestOrders;
 
-	time_t start, end;
+	time_t startTime, endTime;
 	double thinkTime;
-	double diff;
+	double diffTime;
 
 	static Simulator sim;
 	static int turn;
