@@ -1,4 +1,4 @@
-CC=g++
+CC=g++ #-m32
 CFLAGS=-Wall -Wextra -O2
 LDFLAGS=
 

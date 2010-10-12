@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 
-struct LuaParser;
+#define DEBUG
 
 enum LogLevel {
 	LOG_BASIC,
