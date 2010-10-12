@@ -76,13 +76,15 @@ private:
 	int nodesVisited;
 	std::vector<Fleet> bestOrders;
 
+	time_t start, end;
+	double diff;
+
 	static Simulator sim;
 	static int turn;
 	static int maxDepth;
-	static int branchIndex, allBranchIndices;
-	double diff;
-
-	time_t start, end;
+	static int branchIndex;
+	static int allBranchIndices;
+	static int bestBranchIndex;
 };
 
 #endif

@@ -70,6 +70,7 @@ int       AlphaBeta::turn;
 int       AlphaBeta::maxDepth;
 int       AlphaBeta::branchIndex = -1;
 int       AlphaBeta::allBranchIndices = -1;
+int       AlphaBeta::bestBranchIndex = -1;
 
 std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	time(&start);
@@ -90,7 +91,23 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	int score = Search(origin, 0, std::numeric_limits<int>::min(),
 		std::numeric_limits<int>::max());
 
-	LOG("NODES VISITED: " << nodesVisited << "\tSCORE: " << score << " MAXDEPTH: " << maxDepth);
+	std::stringstream time;
+	time << " TIME TAKEN: " << diff;
+	if (diff > MAX_TIME)
+	{
+		time << " BRANCH REACHED: " << branchIndex;
+	}
+
+	LOG("NODES VISITED: " 
+		<< nodesVisited 
+		<< " SCORE: " 
+		<< score
+		<< " BEST BRANCH: "
+		<< bestBranchIndex
+		<< "/"
+		<< allBranchIndices
+		<< time.str());
+
 	return bestOrders;
 }
 
@@ -98,7 +115,7 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 	time(&end); diff = difftime(end, start);
 	if (diff > MAX_TIME)
 	{
-		return alpha;
+		return node.GetScore();
 	}
 
 	nodesVisited++;
@@ -115,16 +132,13 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 		node.RestoreSimulation();
 		return score;
 	}
-	
+
 	Node child(depth+1, node.history, node.curr);
 	std::vector<std::vector<Fleet> > actions = child.GetActions();
+	unsigned int index = 0;
 	for (unsigned int i = 0, n = actions.size(); i < n; i++)
 	{
-		if (depth == 0)
-		{
-			branchIndex = i;
-			allBranchIndices = actions.size();
-		}
+		index = i;
 
 		child.AddOrders(actions[i]);
 		alpha = std::max<int>(alpha, -Search(child, depth+1, -beta, -alpha));
@@ -134,22 +148,25 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 		{
 			break;
 		}
+	}
 
-		if (depth == 0 && alpha > bestScore)
+	if (depth == 0)
+	{
+		branchIndex = index;
+		allBranchIndices = actions.size()-1;
+		if (alpha > bestScore)
 		{
-			bestOrders = actions[i];
+			LOGD("<"<<alpha<<","<<beta);
+			bestBranchIndex = index;
+			bestOrders = actions[index];
 			bestScore = alpha;
 		}
 	}
 
+
 	if (simulate)
 	{
 		node.RestoreSimulation();
-	}
-
-	if (diff > MAX_TIME && depth == 0)
-	{
-		LOG("TIME UP: reached toplevel branch "<<branchIndex<<"/"<<allBranchIndices);
 	}
 
 	return alpha;
@@ -199,14 +216,22 @@ void AlphaBeta::Node::RestoreSimulation() {
 }
 
 int AlphaBeta::Node::GetScore() {
-	sim.Start(MAX_TURNS-turn-(depth/2)+1, curr.AP, curr.AF);
+	int score = 0;
 	if (curr.enemyNumShips <= 0)
-		return std::numeric_limits<int>::max();
-
+	{
+		score = std::numeric_limits<int>::max();
+	}
+	else
 	if (curr.myNumShips <= 0)
-		return std::numeric_limits<int>::min();
-
-	return sim.GetScore();
+	{
+		score = std::numeric_limits<int>::min();
+	}
+	else
+	{
+		sim.Start(MAX_TURNS-turn-(depth/2)+1, curr.AP, curr.AF);
+		score = sim.GetScore();
+	}
+	return score;
 }
 
 bool AlphaBeta::Node::IsTerminal(bool s) {
@@ -505,7 +530,7 @@ std::vector<std::vector<Fleet> > AlphaBeta::Node::GetActions() {
 		ASSERTD(AF.size() == afBeginSize);
 	}
 	// also push back just the default orders as a 'null' action
-	actions.push_back(allOrdersForAnAction);
+	//actions.push_back(allOrdersForAnAction);
 
 	for (unsigned int i = 0; i < actions.size(); i++)
 	{
