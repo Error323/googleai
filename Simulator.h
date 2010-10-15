@@ -5,23 +5,12 @@
 
 #include <vector>
 #include <map>
-#include <utility>
-#include <iostream>
-#include <fstream>
-
-#define LOG(msg)                  \
-	if (file.good())              \
-	{                             \
-		file << msg << std::endl; \
-	}
 
 class Simulator {
 public:
-	Simulator(std::ofstream& filestream, int id_):
+	Simulator():
 		myNumShips(0),
-		enemyNumShips(0),
-		file(filestream),
-		id(id_)
+		enemyNumShips(0)
 	{
 	}
 
@@ -37,27 +26,25 @@ public:
 		int force;
 	};
 
-	void Start(unsigned int, std::vector<Planet>&, std::vector<Fleet>&);
+	void Start(int, std::vector<Planet>&, std::vector<Fleet>&, bool removeFleets = true, bool makeCopy = false);
 	std::vector<PlanetOwner>& GetOwnershipHistory(int i);
 	PlanetOwner& GetFirstEnemyOwner(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
-	bool IsMyPlanet(int i) 			{ return AP[i].Owner() == 1; }
-	bool IsEnemyPlanet(int i) 		{ return AP[i].Owner() > 1; }
+	bool IsMyPlanet(int i) 			{ return AP->at(i).Owner() == 1; }
+	bool IsEnemyPlanet(int i) 		{ return AP->at(i).Owner() > 1; }
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }
-	std::vector<Planet>& Planets()	{ return AP; }
-	std::vector<Fleet>&  Fleets()	{ return AF; }
-	Planet& GetPlanet(int i)		{ return AP[i]; }
+	Planet& GetPlanet(int i)		{ return AP->at(i); }
 
 private:
 	int myNumShips;
 	int enemyNumShips;
-	int id;
-	std::ofstream& file;
-	std::vector<Planet> AP;
-	std::vector<Fleet>  AF;
+	std::vector<Planet> _AP;
+	std::vector<Fleet> _AF;
+	std::vector<Planet>* AP;
+	std::vector<Fleet>* AF;
 	// <planet, vec<owner, time> >
 	std::map<int, std::vector<PlanetOwner> > ownershipHistory;
 	void ChangeOwner(Planet& p, int owner, int time, int force);

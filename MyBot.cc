@@ -1,16 +1,14 @@
 #include "PlanetWars.h"
 #include "Simulator.h"
+#include "Logger.h"
 
 #include <iostream>
-#include <fstream>
 #include <algorithm>
 #include <limits>
-#include <cassert>
 #include <cmath>
-#include <utility>
 
 
-#define VERSION "10.0"
+#define VERSION "12.0"
 
 #define MAX_ROUNDS 200
 
@@ -40,7 +38,7 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 }
 
 void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
-			std::vector<Planet>& AP, std::vector<Fleet>& AF, std::ofstream& file) {
+			std::vector<Planet>& AP, std::vector<Fleet>& AF) {
 	if (success)
 	{
 		for (unsigned int j = 0, m = orders.size(); j < m; j++)
@@ -69,7 +67,7 @@ void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
 	}
 }
 
-void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
+void DoTurn(PlanetWars& pw, int turn) {
 	globalPW = &pw;
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
@@ -81,9 +79,9 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 	std::vector<int>    EFIDX;  // enemy fleets
 	std::vector<int>    MFIDX;  // my fleets
 
-	Simulator s0(file, 0);
-	Simulator s1(file, 1);
-	s0.Start(MAX_ROUNDS-curRound, AP, AF);
+	Simulator s0;
+	Simulator s1;
+	s0.Start(MAX_ROUNDS-turn, AP, AF);
 	int score = s0.GetScore();
 	int myNumShips    = 0;
 	int enemyNumShips = 0;
@@ -115,7 +113,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 	}
 
 	static int sDistance;
-	if (curRound == 0)
+	if (turn == 0)
 	{
 		double x = (AP[NTPIDX[0]].X() - AP[EPIDX[0]].X());
 		double y = (AP[NTPIDX[0]].Y() - AP[EPIDX[0]].Y());
@@ -189,7 +187,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
 				AF.push_back(orders.back());
 				source.NumShips(source.NumShips() - numShips);
-				s0.Start(MAX_ROUNDS-curRound, AP, AF);
+				s0.Start(MAX_ROUNDS-turn, AP, AF);
 			}
 			if (s0.IsMyPlanet(tid))
 			{
@@ -197,7 +195,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 				break;
 			}
 		}
-		AcceptOrRestore(successfullAttack, target, orders, AP, AF, file);
+		AcceptOrRestore(successfullAttack, target, orders, AP, AF);
 	}
 	
 	// (2) overtake neutral planets captured by enemy in the future
@@ -245,7 +243,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 					break;
 				}
 			}
-			AcceptOrRestore(successfullAttack, target, orders, AP, AF, file);
+			AcceptOrRestore(successfullAttack, target, orders, AP, AF);
 		}
 	}
 
@@ -281,7 +279,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 				source.NumShips(source.NumShips() - fleetSize);
 
 				// See if given all previous orders, this planet will be ours
-				s1.Start(MAX_ROUNDS-curRound, AP, AF);
+				s1.Start(MAX_ROUNDS-turn, AP, AF);
 				if (s1.GetScore() >= score)
 				{
 					score = s1.GetScore();
@@ -289,7 +287,7 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 					break;
 				}
 			}
-			AcceptOrRestore(successfullAttack, target, orders, AP, AF, file);
+			AcceptOrRestore(successfullAttack, target, orders, AP, AF);
 		}
 	}
 }
@@ -298,11 +296,12 @@ void DoTurn(PlanetWars& pw, int curRound, std::ofstream& file) {
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
-	unsigned int curRound = 0;
-	std::ofstream file;
-	std::string filename("-Error323-v");
-	filename = argv[0] + filename + VERSION + ".txt";
-	file.open(filename.c_str(), std::ios::in|std::ios::trunc);
+	Logger logger(std::string(argv[0]) + "-E323-" + VERSION + ".txt");
+	Logger::SetLogger(&logger);
+
+	LOG(argv[0]<<"-E323-v"<<VERSION<<" initialized");
+
+	unsigned int turn = 0;
 	std::string current_line;
 	std::string map_data;
 	while (true) {
@@ -314,11 +313,11 @@ int main(int argc, char *argv[]) {
 			{
 				PlanetWars pw(map_data);
 				map_data = "";
-				LOG("curRound: " << curRound);
+				LOG("turn: " << turn);
 				LOG(pw.ToString());
-				DoTurn(pw, curRound, file);
+				DoTurn(pw, turn);
 				LOG("\n--------------------------------------------------------------------------------\n");
-				curRound++;
+				turn++;
 				pw.FinishTurn();
 			} 
 			else 
@@ -327,10 +326,6 @@ int main(int argc, char *argv[]) {
 			}
 			current_line = "";
 		}
-	}
-	if (file.good())
-	{
-		file.close();
 	}
 	return 0;
 }
