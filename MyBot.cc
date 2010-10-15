@@ -1,38 +1,41 @@
 #include "PlanetWars.h"
 #include "Simulator.h"
 #include "Logger.h"
+#include "vec3.h"
 
 #include <iostream>
 #include <algorithm>
 #include <limits>
 #include <cmath>
+#include <string>
 
 
 #define VERSION "12.0"
 
 #define MAX_ROUNDS 200
 
-PlanetWars* globalPW     = NULL;
-int         globalTarget = 0;
+PlanetWars*          globalPW     = NULL;
+std::vector<Planet>* gAP          = NULL;
+int                  globalTarget = 0;
 
 bool SortOnGrowthRate(const int pidA, const int pidB) {
-	const Planet& a = gAP[pidA];
-	const Planet& b = gAP[pidB];
+	const Planet& a = gAP->at(pidA);
+	const Planet& b = gAP->at(pidB);
 	return a.GrowthRate() > b.GrowthRate();
 }
 
 bool SortOnDistanceToTarget(const int pidA, const int pidB) {
-	const Planet& t = gAP[globalTarget];
-	const Planet& a = gAP[pidA];
-	const Planet& b = gAP[pidB];
+	const Planet& t = gAP->at(globalTarget);
+	const Planet& a = gAP->at(pidA);
+	const Planet& b = gAP->at(pidB);
 	const int distA = a.Distance(t);
 	const int distB = b.Distance(t);
 	return distA < distB;
 }
 
 bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
-	const Planet& a = gAP[pidA];
-	const Planet& b = gAP[pidB];
+	const Planet& a = gAP->at(pidA);
+	const Planet& b = gAP->at(pidB);
 	
 	double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
 	double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
@@ -85,7 +88,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 
 	Simulator s0;
 	Simulator s1;
-	s0.Start(MAX_ROUNDS-turn, AP, AF);
+	s0.Start(MAX_ROUNDS-turn, AP, AF, false, true);
 	int score = s0.GetScore();
 	int myNumShips    = 0;
 	int enemyNumShips = 0;
@@ -160,8 +163,8 @@ void DoTurn(PlanetWars& pw, int turn) {
 			source.Backup();
 			int sid = source.PlanetID();
 
-			const int distance = pw.Distance(tid, sid);
-			s1.Start(distance, AP, AF);
+			const int distance = source.Distance(target);
+			s1.Start(distance, AP, AF, false, true);
 			Planet& s1P = s1.GetPlanet(tid);
 			while (s0.IsEnemyPlanet(tid) && source.NumShips() > 0)
 			{
@@ -191,7 +194,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
 				AF.push_back(orders.back());
 				source.NumShips(source.NumShips() - numShips);
-				s0.Start(MAX_ROUNDS-turn, AP, AF);
+				s0.Start(MAX_ROUNDS-turn, AP, AF, false, true);
 			}
 			if (s0.IsMyPlanet(tid))
 			{
@@ -226,13 +229,13 @@ void DoTurn(PlanetWars& pw, int turn) {
 
 				source.Backup();
 				int sid = source.PlanetID();
-				const int distance = pw.Distance(tid, sid);
+				const int distance = source.Distance(target);
 
 				// if we are too close don't attack
 				if (distance <= enemy.time)
 					break;
 
-				s1.Start(distance, AP, AF);
+				s1.Start(distance, AP, AF, false, true);
 				const int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
 				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
 				orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
@@ -240,7 +243,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 				source.NumShips(source.NumShips() - fleetSize);
 
 				// See if given all previous orders, this planet will be ours
-				s1.Start(distance, AP, AF);
+				s1.Start(distance, AP, AF, false, true);
 				if (s1.IsMyPlanet(tid))
 				{
 					successfullAttack = true;
@@ -273,9 +276,9 @@ void DoTurn(PlanetWars& pw, int turn) {
 					continue;
 				source.Backup();
 				int sid = source.PlanetID();
-				const int distance = pw.Distance(tid, sid);
+				const int distance = source.Distance(target);
 
-				s1.Start(distance, AP, AF);
+				s1.Start(distance, AP, AF, false, true);
 				const int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
 				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
 				orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
@@ -283,7 +286,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 				source.NumShips(source.NumShips() - fleetSize);
 
 				// See if given all previous orders, this planet will be ours
-				s1.Start(MAX_ROUNDS-turn, AP, AF);
+				s1.Start(MAX_ROUNDS-turn, AP, AF, false, true);
 				if (s1.GetScore() >= score)
 				{
 					score = s1.GetScore();
