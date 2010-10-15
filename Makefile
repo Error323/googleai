@@ -5,7 +5,7 @@ OBJECTS=MyBot.o Logger.o PlanetWars.o Simulator.o vec3.o
 TARGET=MyBot
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+	$(CC) $(OBJECTS) -o $@
 
 %.o: %.cc
 	$(CC) $(CFLAGS) -o $@ -c $<
