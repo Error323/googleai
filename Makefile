@@ -1,11 +1,10 @@
 CC=g++ -m32
 CFLAGS=-Wall -Wextra -O2
-LDFLAGS=
 
 OBJECTS=MyBot.o Logger.o PlanetWars.o Simulator.o vec3.o
-EXECUTABLE=MyBot
+TARGET=MyBot
 
-$(EXECUTABLE): $(OBJECTS)
+$(TARGET): $(OBJECTS)
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
 
 %.o: %.cc
@@ -13,3 +12,6 @@ $(EXECUTABLE): $(OBJECTS)
 
 clean:
 	rm -rf MyBot *.o *.txt
+
+zip:
+	zip ${TARGET}.zip *.cc *.h

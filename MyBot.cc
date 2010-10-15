@@ -9,7 +9,6 @@
 #include <cmath>
 #include <string>
 
-
 #define VERSION "12.0"
 
 #define MAX_ROUNDS 200
@@ -119,14 +118,6 @@ void DoTurn(PlanetWars& pw, int turn) {
 		}
 	}
 
-	static int sDistance;
-	if (turn == 0)
-	{
-		double x = (AP[NTPIDX[0]].X() - AP[EPIDX[0]].X());
-		double y = (AP[NTPIDX[0]].Y() - AP[EPIDX[0]].Y());
-		sDistance = int(round(sqrt(x*x + y*y)));
-	}
-
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
 		Fleet& f = AF[i];
@@ -143,6 +134,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 	}
 
 
+/*
 	// (1) defend our planets which are to be captured in the future
 	LOG("(1) DEFENSE");
 	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
@@ -297,6 +289,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 			AcceptOrRestore(successfullAttack, target, orders, AP, AF);
 		}
 	}
+	*/
 }
 
 
