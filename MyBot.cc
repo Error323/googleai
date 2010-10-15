@@ -16,20 +16,23 @@ PlanetWars* globalPW     = NULL;
 int         globalTarget = 0;
 
 bool SortOnGrowthRate(const int pidA, const int pidB) {
-	const Planet& a = globalPW->GetPlanet(pidA);
-	const Planet& b = globalPW->GetPlanet(pidB);
+	const Planet& a = gAP[pidA];
+	const Planet& b = gAP[pidB];
 	return a.GrowthRate() > b.GrowthRate();
 }
 
 bool SortOnDistanceToTarget(const int pidA, const int pidB) {
-	int distA = globalPW->Distance(pidA, globalTarget);
-	int distB = globalPW->Distance(pidB, globalTarget);
+	const Planet& t = gAP[globalTarget];
+	const Planet& a = gAP[pidA];
+	const Planet& b = gAP[pidB];
+	const int distA = a.Distance(t);
+	const int distB = b.Distance(t);
 	return distA < distB;
 }
 
 bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
-	const Planet& a = globalPW->GetPlanet(pidA);
-	const Planet& b = globalPW->GetPlanet(pidB);
+	const Planet& a = gAP[pidA];
+	const Planet& b = gAP[pidB];
 	
 	double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
 	double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
@@ -68,9 +71,10 @@ void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
 }
 
 void DoTurn(PlanetWars& pw, int turn) {
-	globalPW = &pw;
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
+	globalPW = &pw;
+	gAP      = &AP;
 	std::vector<int>    NPIDX;  // neutral planets
 	std::vector<int>    EPIDX;  // enemy planets
 	std::vector<int>    NMPIDX; // not my planets
