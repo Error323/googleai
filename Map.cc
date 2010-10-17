@@ -103,8 +103,8 @@ void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
 		if (mdist > edist || pid == mpid)
 			continue;
 
-		HIDX.push_back(pid);
-		mHalf.push_back(PlanetSpecs(
+		MHIDX.push_back(pid);
+		myHalf.push_back(PlanetSpecs(
 			pid,
 			mdist,
 			edist,
@@ -113,14 +113,15 @@ void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
 		));
 	}
 
-	// Get the subset of mHalf that has the maximal growth
+	// Get the subset of myHalf that has the maximal growth
 	// rate such that we can support the start planet
 	bool covered = false;
 	int numShips = myPlanet.NumShips();
-	sort(mHalf.begin(), mHalf.end(), SortOnGrowShipRatio);
-	for (unsigned int i = 0, n = mHalf.size(); i < n; i++)
+	sort(myHalf.begin(), myHalf.end(), SortOnGrowShipRatio);
+
+	for (unsigned int i = 0, n = myHalf.size(); i < n; i++)
 	{
-		PlanetSpecs& ps = mHalf[i];
+		PlanetSpecs& ps = myHalf[i];
 		int numShipsRequired = ps.numShips + 1;
 
 		if (numShips - numShipsRequired <= 0)
@@ -136,49 +137,5 @@ void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
 		Fleet order(1, numShipsRequired, myPlanet.PlanetID(), ps.pID, ps.mDist,
 			ps.mDist);
 		orders.push_back(order);
-	}
-
-	// if not, we need a different set of start planets to capture
-	if (!covered)
-	{
-		double best = -1.0;
-		Fleet order;
-		sort(mHalf.begin(), mHalf.end(), SortOnDistance);
-		for (unsigned int i = 0, n = mHalf.size(); i < n; i++)
-		{
-			PlanetSpecs& ps = mHalf[i];
-			if ((distance - ps.eDist) >= 0 || (distance - ps.mDist*2) > 0)
-			{
-				double r = ps.growRate / (ps.numShips + 1.0);
-				if (r > best)
-				{
-					best = r;
-					order = Fleet(1, ps.numShips+1, myPlanet.PlanetID(),
-						ps.pID, ps.mDist, ps.mDist);
-				}
-			}
-		}
-		// there is nothing we can do
-		if (best == -1.0)
-			return;
-
-		// if we still have enough ships...
-		if (numShips >= order.NumShips() || orders.empty())
-		{
-			orders.push_back(order);
-		}
-
-		// otherwise remove the last order from the queue until we do
-		// have enough ships
-		else
-		{
-			while (numShips < order.NumShips())
-			{
-				Fleet& last = orders.back();
-				numShips += last.NumShips();
-				orders.pop_back();
-			}
-			orders.push_back(order);
-		}
 	}
 }

@@ -164,7 +164,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 
 				if (distance < enemy.time)
 				{
-					numShips = enemy.force - (target.NumShips() + enemy.time*target.GrowthRate());
+					numShips = enemy.force - (simP.NumShips() + (enemy.time-distance)*target.GrowthRate());
 				}
 				else
 				{
@@ -172,6 +172,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 				}
 				numShips = std::min<int>(source.NumShips(), numShips);
 
+				ASSERT(numShips <= 0);
 				if (numShips <= 0)
 					break;
 
@@ -202,7 +203,6 @@ void DoTurn(PlanetWars& pw, int turn) {
 	}
 
 	LOG("(2) SNIPE");
-	/*
 	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[NPIDX[i]];
@@ -218,9 +218,6 @@ void DoTurn(PlanetWars& pw, int turn) {
 			for (unsigned int j = 0, m = FLPIDX.size(); j < m; j++)
 			{
 				Planet& source = AP[FLPIDX[j]];
-				if (source.NumShips() <= 0)
-					continue;
-
 				const int sid = source.PlanetID();
 				const int distance = source.Distance(target);
 				if (distance == enemy.time+1)
@@ -236,7 +233,6 @@ void DoTurn(PlanetWars& pw, int turn) {
 			IssueOrders(orders);
 		}
 	}
-	*/
 
 	LOG("(3) ENFORCE");
 	for (unsigned int i = 0, n = MPIDX.size(); i < n; i++)
