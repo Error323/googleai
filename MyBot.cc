@@ -10,7 +10,7 @@
 #include <cmath>
 #include <string>
 
-#define VERSION "12.0"
+#define VERSION "12.1"
 
 #define MAX_ROUNDS 200
 
