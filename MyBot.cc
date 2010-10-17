@@ -54,6 +54,21 @@ int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EF
 	return numShipsRequired;
 }
 
+int GetWeakness(const int tid, const int dist, std::vector<int>& EPIDX) {
+	int weakness = 0;
+	Planet& target = gAP->at(tid);
+	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
+	{
+		Planet& candidate = gAP->at(EPIDX[i]);
+		int distance = target.Distance(candidate);
+		if (distance > dist)
+		{
+			weakness++;
+		}
+	}
+	return weakness;
+}
+
 void IssueOrders(std::vector<Fleet>& orders) {
 	for (unsigned int i = 0, n = orders.size(); i < n; i++)
 	{
@@ -267,33 +282,40 @@ void DoTurn(PlanetWars& pw, int turn) {
 	IssueOrders(orders);
 	
 	LOG("(4) ATTACK");
-	for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+	if (!EPIDX.empty())
 	{
-		Planet& source = AP[FLPIDX[i]];
-		const int sid = source.PlanetID();
-
-		int closestDist = std::numeric_limits<int>::max();
-		int tid = -1;
-		for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
+		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 		{
-			Planet& target = AP[EPIDX[j]];
-			int dist = target.Distance(source);
-			if (dist < closestDist)
+			Planet& source = AP[FLPIDX[i]];
+			const int sid = source.PlanetID();
+
+			gTarget = sid;
+			sort(EPIDX.begin(), EPIDX.end(), SortOnDistanceToTarget);
+			int tid = EPIDX.front();
+			int dist = source.Distance(AP[tid]);
+			int weakest = GetWeakness(tid, dist, EPIDX);
+			for (unsigned int j = 1, m = EPIDX.size(); j < m; j++)
 			{
-				closestDist = dist;
-				tid = target.PlanetID();
+				int d = source.Distance(AP[EPIDX[j]]);
+				int w = GetWeakness(EPIDX[j], d, EPIDX);
+				if (w > weakest)
+				{
+					tid = EPIDX[j];
+					weakest = w;
+					dist = d;
+				}
+			}
+
+			const int numShips = source.NumShips() - GetRequiredShips(sid, AF, EFIDX);
+
+			sim.Start(dist, AP, AF, false, true);
+			if (sim.GetPlanet(tid).NumShips() < numShips)
+			{
+				orders.push_back(Fleet(1, numShips, sid, tid, dist, dist));
 			}
 		}
-
-		const int numShips = source.NumShips() - GetRequiredShips(sid, AF, EFIDX);
-
-		sim.Start(closestDist, AP, AF, false, true);
-		if (tid != -1 && sim.GetPlanet(tid).NumShips() < numShips)
-		{
-			orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
-		}
+		IssueOrders(orders);
 	}
-	IssueOrders(orders);
 }
 
 // This is just the main game loop that takes care of communicating with the
