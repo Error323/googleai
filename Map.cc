@@ -2,6 +2,7 @@
 #include "Logger.h"
 
 #include <algorithm>
+#include <limits>
 
 bool SortOnGrowShipRatio(const Map::PlanetSpecs& a, const Map::PlanetSpecs& b) {
 	const double growA = a.growRate / (1.0*a.numShips + 1.0);
@@ -57,9 +58,9 @@ Map::Map(std::vector<Planet>& ap): AP(ap) {
 	for (MIter i = tmp.begin(); i != tmp.end(); i++)
 	{
 		const int numShips = AP[i->first].NumShips();
-		if (find(FLIDX.begin(), FLIDX.end(), i->second) == FLIDX.end())
+		if (find(FLPIDX.begin(), FLPIDX.end(), i->second) == FLPIDX.end())
 		{
-			FLIDX.push_back(i->second);
+			FLPIDX.push_back(i->second);
 			FL[i->second] = numShips;
 		}
 		else
@@ -67,6 +68,22 @@ Map::Map(std::vector<Planet>& ap): AP(ap) {
 			FL[i->second] += numShips;
 		}
 	}
+}
+
+int Map::GetClosestFrontLinePlanetIdx(const Planet& p) {
+	int closestDist = std::numeric_limits<int>::max();
+	int closestPid  = -1;
+	for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+	{
+		const Planet& t = AP[FLPIDX[i]];
+		int dist = t.Distance(p);
+		if (dist < closestDist)
+		{
+			closestDist = dist;
+			closestPid = t.PlanetID();
+		}
+	}
+	return closestPid;
 }
 
 void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {

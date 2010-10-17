@@ -132,7 +132,7 @@ void Simulator::Start(int totalTurns,
 			{
 				if (force > p.NumShips())
 				{
-					ChangeOwner(p, owner, turnsTaken, force-p.NumShips());
+					ChangeOwner(p, owner, turnsTaken, force);
 				}
 				p.NumShips(abs(p.NumShips() - force));
 			}
@@ -209,12 +209,12 @@ std::vector<Simulator::PlanetOwner>& Simulator::GetOwnershipHistory(int i) {
 	return ownershipHistory[i]; 
 }
 
-void Simulator::ChangeOwner(Planet& p, int owner, int time, int forceLeft) {
+void Simulator::ChangeOwner(Planet& p, int owner, int time, int force) {
 	if (ownershipHistory.find(p.PlanetID()) == ownershipHistory.end())
 	{
 		ownershipHistory[p.PlanetID()] = std::vector<PlanetOwner>();
 	}
-	ownershipHistory[p.PlanetID()].push_back(PlanetOwner(owner,time,forceLeft));
+	ownershipHistory[p.PlanetID()].push_back(PlanetOwner(owner,time,force));
 	p.Owner(owner);
 }
 

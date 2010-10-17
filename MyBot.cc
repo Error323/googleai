@@ -51,10 +51,13 @@ void IssueOrders(std::vector<Fleet>& orders) {
 
 		int sid = order.SourcePlanet();
 		ASSERT_MSG(gAP->at(sid).Owner() == 1, order);
+		ASSERT_MSG(gAP->at(sid).NumShips() >= numships, order);
 
 		int tid = order.DestinationPlanet();
+		ASSERT_MSG(tid >= 0 && tid != sid, order);
 		gPW->IssueOrder(sid, tid, numships);
 	}
+	orders.clear();
 }
 
 void DoTurn(PlanetWars& pw, int turn) {
@@ -132,12 +135,74 @@ void DoTurn(PlanetWars& pw, int turn) {
 		IssueOrders(orders);
 		return;
 	}
+	std::vector<int>& FLPIDX = map.GetFrontLine();
+	std::vector<Fleet> orders;
 
 	LOG("(1) DEFENSE");
+	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
+	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[TPIDX[i]];
+		const int tid = target.PlanetID();
+		
+		gTarget = tid;
+		bool success = false;
+		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+		{
+			Planet& source = AP[NTPIDX[j]];
+			int sid = source.PlanetID();
+
+			const int distance = source.Distance(target);
+			sim.Start(distance, AP, AF, false, true);
+			Planet& simP = sim.GetPlanet(tid);
+			source.Backup();
+			while (end.IsEnemyPlanet(tid) && source.NumShips() > 0)
+			{
+				Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+				int numShips;
+
+				if (distance < enemy.time)
+				{
+					numShips = enemy.force - (target.NumShips() + enemy.time*target.GrowthRate());
+				}
+				else
+				{
+					break;
+				}
+				numShips = std::min<int>(source.NumShips(), numShips);
+
+				if (numShips <= 0)
+					break;
+
+				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
+				AF.push_back(orders.back());
+				source.NumShips(source.NumShips() - numShips);
+				end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+			}
+			if (end.IsMyPlanet(tid))
+			{
+				success = true;
+				break;
+			}
+		}
+		if (success)
+		{
+			IssueOrders(orders);
+		}
+		else
+		{
+			for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			{
+				AP[orders[j].SourcePlanet()].Restore();
+			}
+			AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
+			orders.clear();
+		}
+	}
 
 	LOG("(2) SNIPE");
 	/*
-	std::vector<int>& FLPIDX = map.GetFrontLine();
 	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[NPIDX[i]];
@@ -173,14 +238,79 @@ void DoTurn(PlanetWars& pw, int turn) {
 	}
 	*/
 
-	if (score < 0)
+	// send all ships to the frontline
+	for (unsigned int i = 0, n = MPIDX.size(); i < n; i++)
+	{
+
+		Planet& source = AP[MPIDX[i]];
+		const int sid = source.PlanetID();
+
+		if (find(FLPIDX.begin(), FLPIDX.end(), sid) != FLPIDX.end())
+			continue;
+
+		int numShipsRequired = 0;
+		for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
+		{
+			Fleet& enemy = AF[EFIDX[j]];
+			if (enemy.DestinationPlanet() == sid)
+			{
+				numShipsRequired += enemy.NumShips();
+			}
+		}
+		const int numShips = source.NumShips() - numShipsRequired;
+		
+		const int tid = map.GetClosestFrontLinePlanetIdx(source);
+		if (tid != -1 && numShips > 0)
+		{
+			orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
+		}
+	}
+	IssueOrders(orders);
+	
+	if (end.GetScore() < 0)
 	{
 		LOG("(3.1) LOSING");
 	}
 	else
-	if (score > 0)
+	if (end.GetScore() > 0)
 	{
 		LOG("(3.2) WINNING");
+		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+		{
+			Planet& source = AP[FLPIDX[i]];
+			const int sid = source.PlanetID();
+
+			int closestDist = std::numeric_limits<int>::max();
+			int tid = -1;
+			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
+			{
+				Planet& target = AP[EPIDX[j]];
+				int dist = target.Distance(source);
+				if (dist < closestDist)
+				{
+					closestDist = dist;
+					tid = target.PlanetID();
+				}
+			}
+
+			int numShipsRequired = 0;
+			for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
+			{
+				Fleet& enemy = AF[EFIDX[j]];
+				if (enemy.DestinationPlanet() == sid)
+				{
+					numShipsRequired += enemy.NumShips();
+				}
+			}
+			const int numShips = source.NumShips() - numShipsRequired;
+
+			sim.Start(closestDist, AP, AF, false, true);
+			if (tid != -1 && sim.GetPlanet(tid).NumShips() < numShips)
+			{
+				orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
+			}
+		}
+		IssueOrders(orders);
 	}
 	else
 	{
@@ -367,7 +497,6 @@ int main(int argc, char *argv[]) {
 				PlanetWars pw(map_data);
 				map_data = "";
 				LOG("turn: " << turn);
-				LOG(pw.ToString());
 				DoTurn(pw, turn);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;

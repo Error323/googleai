@@ -28,8 +28,10 @@ public:
 	};
 
 	void Init(const int, const int, std::vector<Fleet>& orders);
-	std::vector<int>& GetFrontLine() { return FLIDX; }
-	int GetEnemyStrength(const int pid) { return FL[pid]; }
+	int GetClosestFrontLinePlanetIdx(const Planet&);
+
+	std::vector<int>& GetFrontLine()								{ return FLPIDX; }
+	int GetEnemyStrength(const int pid)								{ return FL[pid]; }
 
 private:
 	const std::vector<Planet>& AP;
@@ -37,7 +39,7 @@ private:
 
 	std::map<int, int> FL;    // frontline and the strength they need
 	std::vector<int>  HIDX;   // planets on my initial half
-	std::vector<int>  FLIDX;  // planets on the front line
+	std::vector<int>  FLPIDX; // planets on the front line
 	std::vector<int>  NPIDX;  // neutral planets
 	std::vector<int>  EPIDX;  // enemy planets
 	std::vector<int>  MPIDX;  // all planets belonging to us

@@ -1,4 +1,6 @@
 #include "PlanetWars.h"
+#include "Logger.h"
+
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
