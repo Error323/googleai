@@ -41,6 +41,19 @@ bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	return growA > growB;
 }
 
+int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
+	int numShipsRequired = 0;
+	for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
+	{
+		Fleet& enemy = AF[EFIDX[j]];
+		if (enemy.DestinationPlanet() == sid)
+		{
+			numShipsRequired += enemy.NumShips();
+		}
+	}
+	return numShipsRequired;
+}
+
 void IssueOrders(std::vector<Fleet>& orders) {
 	for (unsigned int i = 0, n = orders.size(); i < n; i++)
 	{
@@ -124,7 +137,6 @@ void DoTurn(PlanetWars& pw, int turn) {
 			enemyNumShips += f.NumShips();
 		}
 	}
-	int score = myNumShips - enemyNumShips;
 
 	Map map(AP);
 	if (turn == 0)
@@ -244,16 +256,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 		if (find(FLPIDX.begin(), FLPIDX.end(), sid) != FLPIDX.end())
 			continue;
 
-		int numShipsRequired = 0;
-		for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
-		{
-			Fleet& enemy = AF[EFIDX[j]];
-			if (enemy.DestinationPlanet() == sid)
-			{
-				numShipsRequired += enemy.NumShips();
-			}
-		}
-		const int numShips = source.NumShips() - numShipsRequired;
+		const int numShips = source.NumShips() - GetRequiredShips(sid, AF, EFIDX);
 		
 		const int tid = map.GetClosestFrontLinePlanetIdx(source);
 		if (tid != -1 && numShips > 0)
@@ -282,16 +285,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 			}
 		}
 
-		int numShipsRequired = 0;
-		for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
-		{
-			Fleet& enemy = AF[EFIDX[j]];
-			if (enemy.DestinationPlanet() == sid)
-			{
-				numShipsRequired += enemy.NumShips();
-			}
-		}
-		const int numShips = source.NumShips() - numShipsRequired;
+		const int numShips = source.NumShips() - GetRequiredShips(sid, AF, EFIDX);
 
 		sim.Start(closestDist, AP, AF, false, true);
 		if (tid != -1 && sim.GetPlanet(tid).NumShips() < numShips)
@@ -305,6 +299,9 @@ void DoTurn(PlanetWars& pw, int turn) {
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
+	(void) argc;
+	(void) argv;
+
 	Logger logger(std::string(argv[0]) + "-E323-" + VERSION + ".txt");
 	Logger::SetLogger(&logger);
 

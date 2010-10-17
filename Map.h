@@ -4,7 +4,6 @@
 #include "PlanetWars.h"
 
 #include <vector>
-#include <map>
 
 class Map {
 public:
@@ -31,13 +30,11 @@ public:
 	int GetClosestFrontLinePlanetIdx(const Planet&);
 
 	std::vector<int>& GetFrontLine()								{ return FLPIDX; }
-	int GetEnemyStrength(const int pid)								{ return FL[pid]; }
 
 private:
 	const std::vector<Planet>& AP;
 	std::vector<PlanetSpecs> myHalf;
 
-	std::map<int, int> FL;    // frontline and the strength they need
 	std::vector<int>  MHIDX;   // planets on my initial half
 	std::vector<int>  FLPIDX;  // planets on the front line
 	std::vector<int>  NPIDX;  // neutral planets

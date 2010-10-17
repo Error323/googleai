@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <map>
 
 bool SortOnGrowShipRatio(const Map::PlanetSpecs& a, const Map::PlanetSpecs& b) {
 	const double growA = a.growRate / (1.0*a.numShips + 1.0);
@@ -57,15 +58,9 @@ Map::Map(std::vector<Planet>& ap): AP(ap) {
 	typedef std::map<int, int>::iterator MIter;
 	for (MIter i = tmp.begin(); i != tmp.end(); i++)
 	{
-		const int numShips = AP[i->first].NumShips();
 		if (find(FLPIDX.begin(), FLPIDX.end(), i->second) == FLPIDX.end())
 		{
 			FLPIDX.push_back(i->second);
-			FL[i->second] = numShips;
-		}
-		else
-		{
-			FL[i->second] += numShips;
 		}
 	}
 }
