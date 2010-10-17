@@ -138,7 +138,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 	std::vector<int>& FLPIDX = map.GetFrontLine();
 	std::vector<Fleet> orders;
 
-	LOG("(1) DEFENSE");
+	LOG("(1) DEFEND");
 	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
@@ -238,7 +238,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 	}
 	*/
 
-	// send all ships to the frontline
+	LOG("(3) ENFORCE");
 	for (unsigned int i = 0, n = MPIDX.size(); i < n; i++)
 	{
 
@@ -267,214 +267,44 @@ void DoTurn(PlanetWars& pw, int turn) {
 	}
 	IssueOrders(orders);
 	
-	if (end.GetScore() < 0)
+	LOG("(4) ATTACK");
+	for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 	{
-		LOG("(3.1) LOSING");
-	}
-	else
-	if (end.GetScore() > 0)
-	{
-		LOG("(3.2) WINNING");
-		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+		Planet& source = AP[FLPIDX[i]];
+		const int sid = source.PlanetID();
+
+		int closestDist = std::numeric_limits<int>::max();
+		int tid = -1;
+		for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
 		{
-			Planet& source = AP[FLPIDX[i]];
-			const int sid = source.PlanetID();
-
-			int closestDist = std::numeric_limits<int>::max();
-			int tid = -1;
-			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
+			Planet& target = AP[EPIDX[j]];
+			int dist = target.Distance(source);
+			if (dist < closestDist)
 			{
-				Planet& target = AP[EPIDX[j]];
-				int dist = target.Distance(source);
-				if (dist < closestDist)
-				{
-					closestDist = dist;
-					tid = target.PlanetID();
-				}
-			}
-
-			int numShipsRequired = 0;
-			for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
-			{
-				Fleet& enemy = AF[EFIDX[j]];
-				if (enemy.DestinationPlanet() == sid)
-				{
-					numShipsRequired += enemy.NumShips();
-				}
-			}
-			const int numShips = source.NumShips() - numShipsRequired;
-
-			sim.Start(closestDist, AP, AF, false, true);
-			if (tid != -1 && sim.GetPlanet(tid).NumShips() < numShips)
-			{
-				orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
+				closestDist = dist;
+				tid = target.PlanetID();
 			}
 		}
-		IssueOrders(orders);
+
+		int numShipsRequired = 0;
+		for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
+		{
+			Fleet& enemy = AF[EFIDX[j]];
+			if (enemy.DestinationPlanet() == sid)
+			{
+				numShipsRequired += enemy.NumShips();
+			}
+		}
+		const int numShips = source.NumShips() - numShipsRequired;
+
+		sim.Start(closestDist, AP, AF, false, true);
+		if (tid != -1 && sim.GetPlanet(tid).NumShips() < numShips)
+		{
+			orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
+		}
 	}
-	else
-	{
-		LOG("(3.3) DRAWING");
-	}
+	IssueOrders(orders);
 }
-
-/*
-	// (1) defend our planets which are to be captured in the future
-	LOG("(1) DEFENSE");
-	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
-	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
-	{
-		Planet& target = AP[TPIDX[i]];
-		const int tid = target.PlanetID();
-		std::vector<Fleet>  orders;
-		
-		globalTarget = tid;
-		bool successfullAttack = false;
-		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
-		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
-		{
-			Planet& source = AP[NTPIDX[j]];
-			if (source.NumShips() <= 0)
-				continue;
-			source.Backup();
-			int sid = source.PlanetID();
-
-			const int distance = source.Distance(target);
-			s1.Start(distance, AP, AF, false, true);
-			Planet& s1P = s1.GetPlanet(tid);
-			while (s0.IsEnemyPlanet(tid) && source.NumShips() > 0)
-			{
-				Simulator::PlanetOwner& enemy = s0.GetFirstEnemyOwner(tid);
-				int numShips;
-
-				if (distance < enemy.time)
-				{
-					numShips = enemy.force - (target.NumShips() + enemy.time*target.GrowthRate());
-					LOG("distance < enemy.time, ships: "<<numShips);
-				}
-				else
-				if (distance > enemy.time)
-				{
-					numShips = s1P.NumShips() + 1;
-					LOG("distance > enemy.time, ships: "<<numShips);
-				}
-				else
-				{
-					numShips = enemy.force;
-					LOG("distance = enemy.time, ships: "<<numShips);
-				}
-
-				// FIXME: This should not happen...
-				if (numShips <= 0) break;
-				numShips = std::min<int>(source.NumShips(), numShips);
-				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
-				AF.push_back(orders.back());
-				source.NumShips(source.NumShips() - numShips);
-				s0.Start(MAX_ROUNDS-turn, AP, AF, false, true);
-			}
-			if (s0.IsMyPlanet(tid))
-			{
-				successfullAttack = true;
-				break;
-			}
-		}
-		AcceptOrRestore(successfullAttack, target, orders, AP, AF);
-	}
-	
-	// (2) overtake neutral planets captured by enemy in the future
-	LOG("(2) ANNOY");
-	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
-	{
-		Planet& target = AP[NPIDX[i]];
-		int tid = target.PlanetID();
-
-		// This neutral planet will be captured by the enemy
-		if (s0.IsEnemyPlanet(tid))
-		{
-			std::vector<Fleet>  orders;
-			
-			globalTarget = tid;
-			Simulator::PlanetOwner& enemy = s0.GetFirstEnemyOwner(tid);
-			bool successfullAttack = false;
-			sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
-			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
-			{
-				Planet& source = AP[NTPIDX[j]];
-				if (source.NumShips() <= 0)
-					continue;
-
-				source.Backup();
-				int sid = source.PlanetID();
-				const int distance = source.Distance(target);
-
-				// if we are too close don't attack
-				if (distance <= enemy.time)
-					break;
-
-				s1.Start(distance, AP, AF, false, true);
-				const int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
-				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
-				orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
-				AF.push_back(orders.back());
-				source.NumShips(source.NumShips() - fleetSize);
-
-				// See if given all previous orders, this planet will be ours
-				s1.Start(distance, AP, AF, false, true);
-				if (s1.IsMyPlanet(tid))
-				{
-					successfullAttack = true;
-					break;
-				}
-			}
-			AcceptOrRestore(successfullAttack, target, orders, AP, AF);
-		}
-	}
-
-	// (3) annihilate when we are definitly winning
-	LOG("(3) ANNIHILATE");
-	if (myNumShips > enemyNumShips*2)
-	{
-		sort(NMPIDX.begin(), NMPIDX.end(), SortOnGrowthShipRatio);
-		for (unsigned int i = 0, n = NMPIDX.size(); i < n; i++)
-		{
-			Planet& target = AP[NMPIDX[i]];
-			int tid = target.PlanetID();
-
-			std::vector<Fleet> orders;
-			
-			globalTarget = tid;
-			bool successfullAttack = false;
-			sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
-			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
-			{
-				Planet& source = AP[NTPIDX[j]];
-				if (source.NumShips() <= 0)
-					continue;
-				source.Backup();
-				int sid = source.PlanetID();
-				const int distance = source.Distance(target);
-
-				s1.Start(distance, AP, AF, false, true);
-				const int fleetsRequired = s1.GetPlanet(tid).NumShips() + 1;
-				const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
-				orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
-				AF.push_back(orders.back());
-				source.NumShips(source.NumShips() - fleetSize);
-
-				// See if given all previous orders, this planet will be ours
-				s1.Start(MAX_ROUNDS-turn, AP, AF, false, true);
-				if (s1.GetScore() >= score)
-				{
-					score = s1.GetScore();
-					successfullAttack = true;
-					break;
-				}
-			}
-			AcceptOrRestore(successfullAttack, target, orders, AP, AF);
-		}
-	}
-	*/
-
 
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
