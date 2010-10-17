@@ -2,6 +2,7 @@
 #include "Simulator.h"
 #include "Logger.h"
 #include "vec3.h"
+#include "Map.h"
 
 #include <iostream>
 #include <algorithm>
@@ -13,9 +14,9 @@
 
 #define MAX_ROUNDS 200
 
-PlanetWars*          globalPW     = NULL;
-std::vector<Planet>* gAP          = NULL;
-int                  globalTarget = 0;
+PlanetWars*          gPW     = NULL;
+std::vector<Planet>* gAP     = NULL;
+int                  gTarget = 0;
 
 bool SortOnGrowthRate(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
@@ -24,7 +25,7 @@ bool SortOnGrowthRate(const int pidA, const int pidB) {
 }
 
 bool SortOnDistanceToTarget(const int pidA, const int pidB) {
-	const Planet& t = gAP->at(globalTarget);
+	const Planet& t = gAP->at(gTarget);
 	const Planet& a = gAP->at(pidA);
 	const Planet& b = gAP->at(pidB);
 	const int distA = a.Distance(t);
@@ -35,84 +36,72 @@ bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
 	const Planet& b = gAP->at(pidB);
-	
-	double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
-	double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
-
+	const double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
+	const double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
 	return growA > growB;
 }
 
-void AcceptOrRestore(bool success, Planet& target, std::vector<Fleet>& orders,
-			std::vector<Planet>& AP, std::vector<Fleet>& AF) {
-	if (success)
+void IssueOrders(std::vector<Fleet>& orders) {
+	for (unsigned int i = 0, n = orders.size(); i < n; i++)
 	{
-		for (unsigned int j = 0, m = orders.size(); j < m; j++)
-		{
-			Fleet& order = orders[j];
-			if (order.NumShips() > 0)
-			{
-				globalPW->IssueOrder(order.SourcePlanet(),
-					order.DestinationPlanet(), order.NumShips());
-			}
-			else
-			{
-				LOG("ERROR: order has 0 ships - "<<order);
-			}
-		}
-	}
-	else // restore previous state
-	{
-		AP[target.PlanetID()].Restore();
-		for (unsigned int j = 0, m = orders.size(); j < m; j++)
-		{
-			Fleet& order = orders[j];
-			AP[order.SourcePlanet()].Restore();
-		}
-		AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
+		Fleet& order = orders[i];
+
+		int numships = order.NumShips();
+		ASSERT_MSG(numships > 0, order);
+
+		int sid = order.SourcePlanet();
+		ASSERT_MSG(gAP->at(sid).Owner() == 1, order);
+
+		int tid = order.DestinationPlanet();
+		gPW->IssueOrder(sid, tid, numships);
 	}
 }
 
 void DoTurn(PlanetWars& pw, int turn) {
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
-	globalPW = &pw;
-	gAP      = &AP;
+	gPW                    = &pw;
+	gAP                    = &AP;
 	std::vector<int>    NPIDX;  // neutral planets
 	std::vector<int>    EPIDX;  // enemy planets
 	std::vector<int>    NMPIDX; // not my planets
+	std::vector<int>    MPIDX;  // all planets belonging to us
 	std::vector<int>    TPIDX;  // targetted planets belonging to us
 	std::vector<int>    NTPIDX; // not targetted planets belonging to us
 	std::vector<int>    EFIDX;  // enemy fleets
 	std::vector<int>    MFIDX;  // my fleets
 
-	Simulator s0;
-	Simulator s1;
-	s0.Start(MAX_ROUNDS-turn, AP, AF, false, true);
-	int score = s0.GetScore();
+	Simulator end, sim;
+	end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
 	int myNumShips    = 0;
 	int enemyNumShips = 0;
 
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
+		const int pid = p.PlanetID();
 		switch (p.Owner())
 		{
-			case 0: {
-				NPIDX.push_back(i);
-				NMPIDX.push_back(i); 
+			case 0: 
+			{
+				NPIDX.push_back(pid);
+				NMPIDX.push_back(pid); 
 			} break;
 
-			case 1: {
-				if (p.Owner() == 1 && s0.IsEnemyPlanet(p.PlanetID()))
-					TPIDX.push_back(p.PlanetID());
+			case 1: 
+			{
+				MPIDX.push_back(pid);
+				if (p.Owner() == 1 && end.IsEnemyPlanet(pid))
+					TPIDX.push_back(pid);
 				else
-					NTPIDX.push_back(p.PlanetID());
+					NTPIDX.push_back(pid);
 				myNumShips += p.NumShips();
 			} break;
 
-			default: {
-				NMPIDX.push_back(i); 
-				EPIDX.push_back(i);
+			default: 
+			{
+				NMPIDX.push_back(pid); 
+				EPIDX.push_back(pid);
 				enemyNumShips += p.NumShips();
 			} break;
 		}
@@ -132,7 +121,72 @@ void DoTurn(PlanetWars& pw, int turn) {
 			enemyNumShips += f.NumShips();
 		}
 	}
+	int score = myNumShips - enemyNumShips;
 
+	Map map(AP);
+	if (turn == 0)
+	{
+		std::vector<Fleet> orders;
+		ASSERT(!MPIDX.empty() && !EPIDX.empty());
+		map.Init(MPIDX.back(), EPIDX.back(), orders);
+		IssueOrders(orders);
+		return;
+	}
+
+	LOG("(1) DEFENSE");
+
+	LOG("(2) SNIPE");
+	/*
+	std::vector<int>& FLPIDX = map.GetFrontLine();
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[NPIDX[i]];
+		const int tid = target.PlanetID();
+		gTarget = tid;
+
+		// This neutral planet will be captured by the enemy
+		if (end.IsEnemyPlanet(tid))
+		{
+			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+			std::vector<Fleet> orders;
+			sort(FLPIDX.begin(), FLPIDX.end(), SortOnDistanceToTarget);
+			for (unsigned int j = 0, m = FLPIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[FLPIDX[j]];
+				if (source.NumShips() <= 0)
+					continue;
+
+				const int sid = source.PlanetID();
+				const int distance = source.Distance(target);
+				if (distance == enemy.time+1)
+				{
+					sim.Start(distance, AP, AF, false, true);
+					const int fleetsRequired = sim.GetPlanet(tid).NumShips() + 1;
+					const int fleetSize = std::min<int>(source.NumShips(), fleetsRequired);
+					orders.push_back(Fleet(1, fleetSize, sid, tid, distance, distance));
+					AF.push_back(orders.back());
+					source.NumShips(source.NumShips() - fleetSize);
+				}
+			}
+			IssueOrders(orders);
+		}
+	}
+	*/
+
+	if (score < 0)
+	{
+		LOG("(3.1) LOSING");
+	}
+	else
+	if (score > 0)
+	{
+		LOG("(3.2) WINNING");
+	}
+	else
+	{
+		LOG("(3.3) DRAWING");
+	}
+}
 
 /*
 	// (1) defend our planets which are to be captured in the future
@@ -290,7 +344,6 @@ void DoTurn(PlanetWars& pw, int turn) {
 		}
 	}
 	*/
-}
 
 
 // This is just the main game loop that takes care of communicating with the
@@ -299,7 +352,7 @@ int main(int argc, char *argv[]) {
 	Logger logger(std::string(argv[0]) + "-E323-" + VERSION + ".txt");
 	Logger::SetLogger(&logger);
 
-	LOG(argv[0]<<"-E323-v"<<VERSION<<" initialized");
+	LOG(argv[0]<<"-E323-"<<VERSION<<" initialized");
 
 	unsigned int turn = 0;
 	std::string current_line;
