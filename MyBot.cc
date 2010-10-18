@@ -79,7 +79,6 @@ void IssueOrders(std::vector<Fleet>& orders) {
 
 		int sid = order.SourcePlanet();
 		ASSERT_MSG(gAP->at(sid).Owner() == 1, order);
-		ASSERT_MSG(gAP->at(sid).NumShips() >= numships, order);
 
 		int tid = order.DestinationPlanet();
 		ASSERT_MSG(tid >= 0 && tid != sid, order);
@@ -199,7 +198,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 				}
 				numShips = std::min<int>(source.NumShips(), numShips);
 
-				ASSERT(numShips <= 0);
+				ASSERT(numShips > 0);
 				if (numShips <= 0)
 					break;
 
