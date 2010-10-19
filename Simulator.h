@@ -16,14 +16,16 @@ public:
 
 	struct PlanetOwner {
 		PlanetOwner(){}
-		PlanetOwner(int o, int t, int f):
+		PlanetOwner(int o, int t, int f, int n):
 			owner(o),
 			time(t),
-			force(f)
+			force(f),
+			numships(n)
 		{}
-		int owner;
-		int time;
-		int force;
+		int owner;    // owner of the incomming fleet
+		int time;     // time of impact relative to current turn
+		int force;    // force of incomming fleet
+		int numships; // numships on planet before impact
 	};
 
 	void Start(int, std::vector<Planet>&, std::vector<Fleet>&, bool removeFleets = true, bool makeCopy = false);
@@ -33,6 +35,7 @@ public:
 	bool Winning()					{ return myNumShips > enemyNumShips; }
 	bool IsMyPlanet(int i) 			{ return AP->at(i).Owner() == 1; }
 	bool IsEnemyPlanet(int i) 		{ return AP->at(i).Owner() > 1; }
+	bool IsSniped(int i);
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }

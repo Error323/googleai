@@ -10,7 +10,7 @@
 #include <cmath>
 #include <string>
 
-#define VERSION "12.1"
+#define VERSION "12.2"
 
 #define MAX_ROUNDS 200
 
@@ -73,15 +73,15 @@ void IssueOrders(std::vector<Fleet>& orders) {
 	for (unsigned int i = 0, n = orders.size(); i < n; i++)
 	{
 		Fleet& order = orders[i];
+		const int sid = order.SourcePlanet();
+		const int numships = order.NumShips();
+		const int tid = order.DestinationPlanet();
 
-		int numships = order.NumShips();
 		ASSERT_MSG(numships > 0, order);
-
-		int sid = order.SourcePlanet();
+		ASSERT_MSG(numships <= gAP->at(sid).NumShips(), order);
 		ASSERT_MSG(gAP->at(sid).Owner() == 1, order);
-
-		int tid = order.DestinationPlanet();
 		ASSERT_MSG(tid >= 0 && tid != sid, order);
+		LOG(order);
 		gPW->IssueOrder(sid, tid, numships);
 	}
 	orders.clear();
@@ -96,6 +96,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 	std::vector<int>    EPIDX;  // enemy planets
 	std::vector<int>    NMPIDX; // not my planets
 	std::vector<int>    MPIDX;  // all planets belonging to us
+	std::vector<int>    SPIDX;  // planets sniped by the enemy
 	std::vector<int>    TPIDX;  // targetted planets belonging to us
 	std::vector<int>    NTPIDX; // not targetted planets belonging to us
 	std::vector<int>    EFIDX;  // enemy fleets
@@ -114,7 +115,10 @@ void DoTurn(PlanetWars& pw, int turn) {
 		{
 			case 0: 
 			{
-				NPIDX.push_back(pid);
+				if (end.IsSniped(pid))
+					SPIDX.push_back(pid);
+				else
+					NPIDX.push_back(pid);
 				NMPIDX.push_back(pid); 
 			} break;
 
@@ -166,65 +170,130 @@ void DoTurn(PlanetWars& pw, int turn) {
 
 	LOG("(1) DEFEND");
 	sort(TPIDX.begin(), TPIDX.end(), SortOnGrowthRate);
+	std::map<int, int> defenders; // <src, dst>
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[TPIDX[i]];
 		const int tid = target.PlanetID();
 		
+		Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+		int shipsRequired = enemy.force - enemy.numships;
+
 		gTarget = tid;
 		bool success = false;
 		sort(NTPIDX.begin(), NTPIDX.end(), SortOnDistanceToTarget);
+		// See if we can prevent the enemy takeover by redirecting the feeders
+		// to the targetted planet
+		std::vector<int> FIDX; // feeder indices
 		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
 		{
 			Planet& source = AP[NTPIDX[j]];
-			int sid = source.PlanetID();
-
+			const int sid = source.PlanetID();
 			const int distance = source.Distance(target);
-			sim.Start(distance, AP, AF, false, true);
-			Planet& simP = sim.GetPlanet(tid);
-			source.Backup();
-			while (end.IsEnemyPlanet(tid) && source.NumShips() > 0)
+
+			// Too late
+			if (distance > enemy.time)
 			{
-				Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
-				int numShips;
-
-				if (distance < enemy.time)
-				{
-					numShips = enemy.force - (simP.NumShips() + (enemy.time-distance)*target.GrowthRate());
-				}
-				else
-				{
-					break;
-				}
-				numShips = std::min<int>(source.NumShips(), numShips);
-
-				ASSERT(numShips > 0);
-				if (numShips <= 0)
-					break;
-
-				orders.push_back(Fleet(1, numShips, sid, tid, distance, distance));
-				AF.push_back(orders.back());
-				source.NumShips(source.NumShips() - numShips);
-				end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+				continue;
 			}
-			if (end.IsMyPlanet(tid))
+
+			// Don't use feeders that have a defending role already
+			if (defenders.find(sid) != defenders.end())
+			{
+				continue;
+			}
+
+			// Don't use the frontline initially
+			if (find(FLPIDX.begin(), FLPIDX.end(), sid) != FLPIDX.end())
+			{
+				continue;
+			}
+
+			FIDX.push_back(sid);
+		}
+
+		// Determine how long the feeders will need to be active
+		for (unsigned int t = 1; t <= enemy.time; t++)
+		{
+			for (unsigned int j = 0, m = FIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[FIDX[j]];
+				const int sid = source.PlanetID();
+				if (t == 1)
+					shipsRequired -= std::min<int>(shipsRequired, source.NumShips());
+				else
+					shipsRequired -= std::min<int>(shipsRequired, source.GrowthRate());
+				defenders[sid] = tid;
+			}
+			// We are able to defend this planet
+			if (shipsRequired <= 0)
 			{
 				success = true;
 				break;
 			}
 		}
+
 		if (success)
 		{
-			IssueOrders(orders);
+			continue;
 		}
-		else
+		else // The feeders aren't enough, let the frontline assist
 		{
-			for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			sort(FLPIDX.begin(), FLPIDX.end(), SortOnDistanceToTarget);
+			for (unsigned int j = 0, m = FLPIDX.size(); j < m; j++)
 			{
-				AP[orders[j].SourcePlanet()].Restore();
+				//TODO: Determine whether this frontline planet can and should spare the fleets
+				Planet& source = AP[FLPIDX[j]];
+				const int sid = source.PlanetID();
+				const int distance = source.Distance(target);
+				if (distance > enemy.time)
+				{
+					continue;
+				}
+				if (sid == tid)
+				{
+					continue;
+				}
+				if (find(TPIDX.begin(), TPIDX.end(), sid) != TPIDX.end())
+				{
+					continue;
+				}
+
+				const int numships = std::min<int>(shipsRequired, source.NumShips());
+				source.Backup();
+				source.NumShips(source.NumShips() - numships);
+				orders.push_back(Fleet(1, numships, sid, tid, distance, distance));
+				shipsRequired -= numships;
+				if (shipsRequired <= 0)
+				{
+					success = true;
+					break;
+				}
 			}
-			AF.erase(AF.begin()+AF.size()-orders.size(), AF.end());
-			orders.clear();
+			if (success)
+			{
+				IssueOrders(orders);
+			}
+			else
+			{
+				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+				{
+					AP[orders[j].SourcePlanet()].Restore();
+				}
+				orders.clear();
+				std::vector<int> erase;
+				for (std::map<int,int>::iterator j = defenders.begin(); j != defenders.end(); j++)
+				{
+					if (j->second == tid)
+					{
+						erase.push_back(j->first);
+					}
+				}
+				for (unsigned int j = 0, m = defenders.size(); j < m; j++)
+				{
+					defenders.erase(erase[j]);
+				}
+			}
 		}
 	}
 
@@ -267,15 +336,34 @@ void DoTurn(PlanetWars& pw, int turn) {
 		Planet& source = AP[MPIDX[i]];
 		const int sid = source.PlanetID();
 
+		// Don't enforce if we are the frontline
 		if (find(FLPIDX.begin(), FLPIDX.end(), sid) != FLPIDX.end())
-			continue;
-
-		const int numShips = source.NumShips() - GetRequiredShips(sid, AF, EFIDX);
-		
-		const int tid = map.GetClosestFrontLinePlanetIdx(source);
-		if (tid != -1 && numShips > 0)
 		{
+			continue;
+		}
+
+		// If we are a target, keep our ships
+		if (find(TPIDX.begin(), TPIDX.end(), sid) != TPIDX.end())
+		{
+			continue;
+		}
+
+		// Don't enforce frontline if we are defending
+		if (defenders.find(sid) != defenders.end())
+		{
+			const int numShips = source.NumShips();
+			const int tid = defenders[sid];
 			orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
+		}
+		else
+		{
+			const int requiredShips = GetRequiredShips(sid, AF, EFIDX);
+			const int numShips = source.NumShips() - requiredShips;
+			const int tid = map.GetClosestFrontLinePlanetIdx(source);
+			if (tid != -1 && numShips > 0)
+			{
+				orders.push_back(Fleet(1, numShips, sid, tid, 0, 0));
+			}
 		}
 	}
 	IssueOrders(orders);
@@ -302,6 +390,15 @@ void DoTurn(PlanetWars& pw, int turn) {
 					tid = EPIDX[j];
 					weakest = w;
 					dist = d;
+				}
+			}
+
+			// If we are a target, and our growthrate is better, keep the ships
+			if (find(TPIDX.begin(), TPIDX.end(), sid) != TPIDX.end())
+			{
+				if (AP[tid].GrowthRate() < source.GrowthRate())
+				{
+					continue;
 				}
 			}
 
@@ -341,6 +438,7 @@ int main(int argc, char *argv[]) {
 				PlanetWars pw(map_data);
 				map_data = "";
 				LOG("turn: " << turn);
+				LOG(pw.ToString());
 				DoTurn(pw, turn);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;

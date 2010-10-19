@@ -17,7 +17,6 @@ void Simulator::Start(int totalTurns,
 					bool removeFleets, bool makeCopy) {
 
 	myNumShips = enemyNumShips = 0;
-	ownershipHistory.clear();
 	std::vector<int> skipPlanets;
 	std::list<unsigned int> remove;
 
@@ -34,6 +33,14 @@ void Simulator::Start(int totalTurns,
 	{
 		AP = &ap;
 		AF = &af;
+	}
+
+	ownershipHistory.clear();
+	for (unsigned int i = 0, n = ap.size(); i < n; i++)
+	{
+		Planet& p = ap[i];
+		ownershipHistory[p.PlanetID()] = std::vector<PlanetOwner>();
+		ownershipHistory[p.PlanetID()].push_back(PlanetOwner(p.Owner(), 0, 0, p.NumShips()));
 	}
 
 	sort(AF->begin(), AF->end(), SortOnPlanetAndTurnsLeft);
@@ -210,11 +217,7 @@ std::vector<Simulator::PlanetOwner>& Simulator::GetOwnershipHistory(int i) {
 }
 
 void Simulator::ChangeOwner(Planet& p, int owner, int time, int force) {
-	if (ownershipHistory.find(p.PlanetID()) == ownershipHistory.end())
-	{
-		ownershipHistory[p.PlanetID()] = std::vector<PlanetOwner>();
-	}
-	ownershipHistory[p.PlanetID()].push_back(PlanetOwner(owner,time,force));
+	ownershipHistory[p.PlanetID()].push_back(PlanetOwner(owner,time,force,p.NumShips()));
 	p.Owner(owner);
 }
 
@@ -227,6 +230,26 @@ Simulator::PlanetOwner& Simulator::GetFirstEnemyOwner(int i) {
 			return H[j];
 		}
 	}
-	ASSERT(false);
-	return H[0];
+	ASSERT_MSG(false, "No enemy owner exists for planet " << AP->at(i));
+	return H.front();
+}
+
+bool Simulator::IsSniped(int i) {
+	std::vector<PlanetOwner>& H = GetOwnershipHistory(i);
+	std::vector<int> owners;
+	owners.push_back(2);
+	owners.push_back(1);
+	owners.push_back(0);
+	for (unsigned int j = 0, n = H.size(); j < n; j++)
+	{
+		if (owners.empty())
+		{
+			break;
+		}
+		if (H[j].owner == owners.back())
+		{
+			owners.pop_back();
+		}
+	}
+	return owners.empty();
 }
