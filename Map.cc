@@ -6,16 +6,6 @@
 #include <limits>
 #include <map>
 
-bool SortOnGrowShipRatio(const Map::PlanetSpecs& a, const Map::PlanetSpecs& b) {
-	const double growA = a.growRate / (1.0*a.numShips + 1.0);
-	const double growB = b.growRate / (1.0*b.numShips + 1.0);
-	return growA > growB;
-}
-
-bool SortOnDistance(const Map::PlanetSpecs& a, const Map::PlanetSpecs& b) {
-	return a.mDist < b.mDist;
-}
-
 Map::Map(std::vector<Planet>& ap): AP(ap) {
 	// compute our planets, enemy planets etc
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
@@ -64,7 +54,6 @@ Map::Map(std::vector<Planet>& ap): AP(ap) {
 			FLPIDX.push_back(i->second);
 		}
 	}
-	LOG("Map::Map");
 }
 
 int Map::GetClosestFrontLinePlanetIdx(const Planet& p) {
@@ -84,33 +73,17 @@ int Map::GetClosestFrontLinePlanetIdx(const Planet& p) {
 }
 
 void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
-	LOG("Map::Init");
 	const Planet& myPlanet = AP[mpid];
 	const Planet& enemyPlanet = AP[epid];
 	int distance = myPlanet.Distance(enemyPlanet);
 
 	std::vector<int>    w;
 	std::vector<double> v;
-	// filter out planets closer to us or equally far
-	// from the enemy
-	for (unsigned int i = 0, n = AP.size(); i < n; i++)
+
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
-		const Planet& p = AP[i];
-		int pid   = p.PlanetID();
-		int mdist = p.Distance(myPlanet);
-		int edist = p.Distance(enemyPlanet);
+		const Planet& p = AP[NPIDX[i]];
 
-		if (mdist > edist || pid == mpid)
-			continue;
-
-		MHIDX.push_back(pid);
-		myHalf.push_back(PlanetSpecs(
-			pid,
-			mdist,
-			edist,
-			p.GrowthRate(),
-			p.NumShips()
-		));
 		w.push_back(p.NumShips() + 1);
 		v.push_back(p.GrowthRate() / (myPlanet.Loc() - p.Loc()).len2D());
 	}
@@ -119,10 +92,9 @@ void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
 	std::vector<int>& I = ks.Indices();
 	for (unsigned int i = 0, n = I.size(); i < n; i++)
 	{
-		const Planet& t = AP[MHIDX[I[i]]];
+		const Planet& t = AP[NPIDX[I[i]]];
 		const int d = myPlanet.Distance(t);
 		Fleet f(1, t.NumShips()+1, myPlanet.PlanetID(), t.PlanetID(), d, d);
-		LOG(f);
 		orders.push_back(f);
 	}
 

@@ -3,10 +3,18 @@
 
 #define IDX(i,j) ((i)*(W+1)+(j))
 
-KnapSack::KnapSack(std::vector<int>& w_, std::vector<double>& v_, int W_):
-	w(w_), v(v_), W(W_) {
-	ASSERT(w.size() == v.size());
-	N = w.size()-1;
+KnapSack::KnapSack(std::vector<int>& w_, std::vector<double>& v_, int W_) {
+	Init(w_, v_, W_);
+}
+
+void KnapSack::Init(std::vector<int>& w_, std::vector<double>& v_, int W_) {
+	w = w_;
+	v = v_;
+	W = W_;
+	N = w.size();
+	v.insert(v.begin(),0.0);
+	w.insert(w.begin(),0);
+	ASSERT(w.size() == v.size() && !w.empty());
 	C.resize((N+1)*(W+1), 0.0);
 
 	for (int i = 0; i <= N; i++)
@@ -19,25 +27,24 @@ KnapSack::KnapSack(std::vector<int>& w_, std::vector<double>& v_, int W_):
 				C[IDX(i, j)] = -1.0;
 		}
 	}
+	I.clear();
 }
 
 std::vector<int>& KnapSack::Indices() {
+	ASSERT(!v.empty() && !w.empty());
 	if (!I.empty())
 	{
 		return I;
 	}
 
-	double profit = ZeroOne(N, W);
+	ZeroOne(N, W);
 	int aux = W;
-	for (int i = N; i >= 0; i--)
+	for (int i = N; i > 0; i--)
 	{
-		if (i-1 < 0 || C[IDX(i, aux)] != C[IDX(i - 1,aux)])
+		if (C[IDX(i, aux)] != C[IDX(i - 1, aux)])
 		{
-			if (aux-w[i] >= 0)
-			{
-				I.push_back(i);
-				aux -= w[i];
-			}
+			I.push_back(i-1);
+			aux -= w[i];
 		}
 	}
 	return I;
