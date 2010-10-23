@@ -1,5 +1,6 @@
 #include "Map.h"
 #include "Logger.h"
+#include "KnapSack.h"
 
 #include <algorithm>
 #include <limits>
@@ -63,6 +64,7 @@ Map::Map(std::vector<Planet>& ap): AP(ap) {
 			FLPIDX.push_back(i->second);
 		}
 	}
+	LOG("Map::Map");
 }
 
 int Map::GetClosestFrontLinePlanetIdx(const Planet& p) {
@@ -82,10 +84,13 @@ int Map::GetClosestFrontLinePlanetIdx(const Planet& p) {
 }
 
 void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
+	LOG("Map::Init");
 	const Planet& myPlanet = AP[mpid];
 	const Planet& enemyPlanet = AP[epid];
 	int distance = myPlanet.Distance(enemyPlanet);
 
+	std::vector<int>    w;
+	std::vector<double> v;
 	// filter out planets closer to us or equally far
 	// from the enemy
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
@@ -106,8 +111,22 @@ void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
 			p.GrowthRate(),
 			p.NumShips()
 		));
+		w.push_back(p.NumShips() + 1);
+		v.push_back(p.GrowthRate() / (myPlanet.Loc() - p.Loc()).len2D());
 	}
 
+	KnapSack ks(w, v, myPlanet.NumShips());
+	std::vector<int>& I = ks.Indices();
+	for (unsigned int i = 0, n = I.size(); i < n; i++)
+	{
+		const Planet& t = AP[MHIDX[I[i]]];
+		const int d = myPlanet.Distance(t);
+		Fleet f(1, t.NumShips()+1, myPlanet.PlanetID(), t.PlanetID(), d, d);
+		LOG(f);
+		orders.push_back(f);
+	}
+
+/*
 	// Get the subset of myHalf that has the maximal growth
 	// rate such that we can support the start planet
 	bool covered = false;
@@ -133,4 +152,5 @@ void Map::Init(const int mpid, const int epid, std::vector<Fleet>& orders) {
 			ps.mDist);
 		orders.push_back(order);
 	}
+*/
 }

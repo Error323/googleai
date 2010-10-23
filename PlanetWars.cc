@@ -226,7 +226,10 @@ int PlanetWars::ParseGameState(const std::string& s) {
               atoi(tokens[4].c_str()),  // Destination
               atoi(tokens[5].c_str()),  // Total trip length
               atoi(tokens[6].c_str())); // Turns remaining
-      fleets_.push_back(f);
+	  if (f.NumShips() > 0)
+	  {
+        fleets_.push_back(f);
+	  }
     } else {
       return 0;
     }
