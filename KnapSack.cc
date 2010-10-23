@@ -12,8 +12,6 @@ void KnapSack::Init(std::vector<int>& w_, std::vector<double>& v_, int W_) {
 	v = v_;
 	W = W_;
 	N = w.size();
-	v.insert(v.begin(),0.0);
-	w.insert(w.begin(),0);
 	ASSERT(w.size() == v.size() && !w.empty());
 	C.resize((N+1)*(W+1), 0.0);
 
@@ -44,7 +42,7 @@ std::vector<int>& KnapSack::Indices() {
 		if (C[IDX(i, aux)] != C[IDX(i - 1, aux)])
 		{
 			I.push_back(i-1);
-			aux -= w[i];
+			aux -= w[i-1];
 		}
 	}
 	return I;
@@ -56,13 +54,13 @@ double KnapSack::ZeroOne(int n, int c) {
 	if (C[IDX(n, c)] < 0.0)
 	{
 		temp = ZeroOne(n - 1, c);
-		if (c < w[n])
+		if (c < w[n-1])
 		{
 			val = temp;
 		}
 		else
 		{
-			temp1 = v[n] + ZeroOne(n - 1, c - w[n]);
+			temp1 = v[n-1] + ZeroOne(n - 1, c - w[n-1]);
 			if (temp1 > temp)
 				val = temp1;
 			else
