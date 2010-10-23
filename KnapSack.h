@@ -10,7 +10,7 @@ private:
 	std::vector<double> v; // v_i,...,v_n
 	int W;                 // Max weight possible
 	int N;                 // Max items possible
-	double C[50][101];     // Cost matrix
+	std::vector<double> C; // Cost matrix
 	std::vector<int>    I; // Solution indices
 
 	double ZeroOne(int, int);
