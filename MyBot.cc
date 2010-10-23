@@ -54,19 +54,20 @@ int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EF
 	return numShipsRequired;
 }
 
-int GetWeakness(const int tid, const int dist, std::vector<int>& EPIDX) {
-	int weakness = 0;
+int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
+	int strength = 0;
 	Planet& target = gAP->at(tid);
 	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
 	{
 		Planet& candidate = gAP->at(EPIDX[i]);
 		int distance = target.Distance(candidate);
-		if (distance > dist)
+		if (distance < dist)
 		{
-			weakness++;
+			int time = dist - distance;
+			strength += candidate.NumShips() + time*candidate.GrowthRate();
 		}
 	}
-	return weakness;
+	return strength;
 }
 
 void IssueOrders(std::vector<Fleet>& orders) {
@@ -289,7 +290,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 						erase.push_back(j->first);
 					}
 				}
-				for (unsigned int j = 0, m = defenders.size(); j < m; j++)
+				for (unsigned int j = 0, m = erase.size(); j < m; j++)
 				{
 					defenders.erase(erase[j]);
 				}
@@ -368,7 +369,22 @@ void DoTurn(PlanetWars& pw, int turn) {
 	}
 	IssueOrders(orders);
 	
-	LOG("(4) ATTACK");
+	LOG("(4) CAPTURE");
+	sort(NPIDX.begin(), NPIDX.end(), SortOnGrowthShipRatio);
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[NPIDX[i]];
+		const int tid = target.PlanetID();
+		gTarget = tid;
+		sort(FLPIDX.begin(), FLPIDX.end(), SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = FLPIDX.size(); j < m; j++)
+		{
+			Planet& source = AP[FLPIDX[j]];
+			const int sid = source.PlanetID();
+		}
+	}
+
+	LOG("(5) ATTACK");
 	if (!EPIDX.empty())
 	{
 		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
@@ -378,17 +394,18 @@ void DoTurn(PlanetWars& pw, int turn) {
 
 			gTarget = sid;
 			sort(EPIDX.begin(), EPIDX.end(), SortOnDistanceToTarget);
-			int tid = EPIDX.front();
-			int dist = source.Distance(AP[tid]);
-			int weakest = GetWeakness(tid, dist, EPIDX);
-			for (unsigned int j = 1, m = EPIDX.size(); j < m; j++)
+			int tid = 0;
+			int dist = 0;
+			int numShipsRequired = std::numeric_limits<int>::max();
+			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
 			{
 				int d = source.Distance(AP[EPIDX[j]]);
-				int w = GetWeakness(EPIDX[j], d, EPIDX);
-				if (w > weakest)
+				sim.Start(d, AP, AF, false, true);
+				int s = GetStrength(EPIDX[j], d, EPIDX) + sim.GetPlanet(tid).NumShips();
+				if (s < numShipsRequired)
 				{
 					tid = EPIDX[j];
-					weakest = w;
+					numShipsRequired = s;
 					dist = d;
 				}
 			}
@@ -402,12 +419,17 @@ void DoTurn(PlanetWars& pw, int turn) {
 				}
 			}
 
+			end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+			if (end.IsMyPlanet(tid))
+			{
+				continue;
+			}
+
 			const int numShips = source.NumShips() - GetRequiredShips(sid, AF, EFIDX);
 
-			sim.Start(dist, AP, AF, false, true);
-			if (sim.GetPlanet(tid).NumShips() < numShips)
+			if (numShipsRequired < numShips)
 			{
-				orders.push_back(Fleet(1, numShips, sid, tid, dist, dist));
+				orders.push_back(Fleet(1, numShipsRequired, sid, tid, dist, dist));
 			}
 		}
 		IssueOrders(orders);
