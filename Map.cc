@@ -198,6 +198,9 @@ void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vec
 				const int numShips = std::min<int>(target.NumShips() + 1 -
 					totalShips, shipsToSpare[source.PlanetID()]);
 
+				if (numShips <= 0)
+					break;
+
 				shipsToSpare[source.PlanetID()] -= numShips;
 
 				const int dist = target.Distance(source);
