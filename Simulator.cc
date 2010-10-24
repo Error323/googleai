@@ -152,7 +152,7 @@ void Simulator::Start(int totalTurns,
 		// reset turns taken
 		if (i == n-1 || AF->at(i+1).DestinationPlanet() != f.DestinationPlanet())
 		{
-			if (turnsTaken < totalTurns)
+			if (turnsTaken < totalTurns && p.Owner() > 0)
 			{
 				p.AddShips((totalTurns-turnsTaken)*p.GrowthRate());
 			}

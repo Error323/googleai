@@ -109,6 +109,8 @@ int Map::GetClosestPlanetIdx(const vec3<double>& pos, const std::vector<int>& ca
 }
 
 void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vector<Fleet>& orders, std::vector<int> CNPIDX) {
+	extern const int turn;
+	extern const int MAX_ROUNDS;
 	std::vector<int> MHPIDX(MPIDX); // planets that have spare ships
 	std::vector<int> eraser;
 
@@ -183,20 +185,23 @@ void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vec
 		// make sure all planets that are captured are safe
 		std::vector<Fleet>  AF_(AF);
 		std::vector<Planet> AP_(AP);
+		Simulator sim;
 		for (unsigned int i = 0, n = I.size(); i < n; i++)
 		{
 			const Planet& target = AP_[CNPIDX[I[i]]];
+
 			map::gTarget = target.PlanetID();
 			sort(MHPIDX.begin(), MHPIDX.end(), map::SortOnDistanceToTarget);
-			int totalShips = 0;
 			for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
 			{
-				if (totalShips > target.NumShips())
+				sim.Start(MAX_ROUNDS-turn, AP_, AF_, false, true);
+				const Planet& simTarget = sim.GetPlanet(target.PlanetID());
+
+				if (sim.IsMyPlanet(target.PlanetID()) || sim.IsEnemyPlanet(target.PlanetID()))
 					break;
 
 				Planet& source = AP_[MHPIDX[j]];
-				const int numShips = std::min<int>(target.NumShips() + 1 -
-					totalShips, shipsToSpare[source.PlanetID()]);
+				const int numShips = std::min<int>(simTarget.NumShips()+1, shipsToSpare[source.PlanetID()]);
 
 				if (numShips <= 0)
 					break;
@@ -204,9 +209,9 @@ void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vec
 				shipsToSpare[source.PlanetID()] -= numShips;
 
 				const int dist = target.Distance(source);
-				totalShips += numShips;
 				source.RemoveShips(numShips);
 				Fleet order(1, numShips, source.PlanetID(), target.PlanetID(), dist, dist);
+				LOG(simTarget<<"\t"<<order);
 				orders.push_back(order);
 				AF_.push_back(order);
 			}
@@ -262,10 +267,8 @@ bool Map::IsSafe(const Planet& target, std::vector<Planet>& ap, std::vector<Flee
 			source.RemoveShips(source.NumShips());
 		}
 		sim.Start(1, AP, AF);
-		if (sim.IsEnemyPlanet(target.PlanetID()))
-			return false;
 	}
-	return true;
+	return sim.IsMyPlanet(target.PlanetID());
 }
 
 void Map::Erase(std::vector<int>& subject, std::vector<int>& eraser) {
