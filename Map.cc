@@ -182,7 +182,7 @@ void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vec
 		KnapSack ks(w, v, totalShipsToSpare);
 		std::vector<int>& I = ks.Indices();
 
-		// make sure all planets that are captured are safe
+		// capture the planets from the knapsack
 		std::vector<Fleet>  AF_(AF);
 		std::vector<Planet> AP_(AP);
 		Simulator sim;
@@ -216,6 +216,7 @@ void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vec
 			}
 		}
 
+		// make sure all planets that are captured are safe
 		for (unsigned int i = 0, n = I.size(); i < n; i++)
 		{
 			const Planet& target = AP_[CNPIDX[I[i]]];
