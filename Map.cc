@@ -211,7 +211,6 @@ void Map::GetOrdersForCaptureableNeutrals(const std::vector<Fleet>& AF, std::vec
 				const int dist = target.Distance(source);
 				source.RemoveShips(numShips);
 				Fleet order(1, numShips, source.PlanetID(), target.PlanetID(), dist, dist);
-				LOG(simTarget<<"\t"<<order);
 				orders.push_back(order);
 				AF_.push_back(order);
 			}
