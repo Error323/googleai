@@ -10,36 +10,14 @@
 #include <cmath>
 #include <string>
 
-#define VERSION "12.2"
+#define VERSION "13.0"
 
-#define MAX_ROUNDS 200
+PlanetWars* gPW      = NULL;
+int turn             = 0;
+int MAX_ROUNDS       = 200;
 
-PlanetWars*          gPW     = NULL;
-std::vector<Planet>* gAP     = NULL;
-int                  gTarget = 0;
-
-
-bool SortOnGrowthRate(const int pidA, const int pidB) {
-	const Planet& a = gAP->at(pidA);
-	const Planet& b = gAP->at(pidB);
-	return a.GrowthRate() > b.GrowthRate();
-}
-
-bool SortOnDistanceToTarget(const int pidA, const int pidB) {
-	const Planet& t = gAP->at(gTarget);
-	const Planet& a = gAP->at(pidA);
-	const Planet& b = gAP->at(pidB);
-	const int distA = a.Distance(t);
-	const int distB = b.Distance(t);
-	return distA < distB;
-}
-
-bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
-	const Planet& a = gAP->at(pidA);
-	const Planet& b = gAP->at(pidB);
-	const double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
-	const double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
-	return growA > growB;
+namespace bot {
+	#include "Helper.inl"
 }
 
 int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
@@ -57,10 +35,10 @@ int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EF
 
 int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 	int strength = 0;
-	Planet& target = gAP->at(tid);
+	const Planet& target = bot::gAP->at(tid);
 	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
 	{
-		Planet& candidate = gAP->at(EPIDX[i]);
+		const Planet& candidate = bot::gAP->at(EPIDX[i]);
 		int distance = target.Distance(candidate);
 		if (distance < dist)
 		{
@@ -80,8 +58,8 @@ void IssueOrders(std::vector<Fleet>& orders) {
 		const int tid = order.DestinationPlanet();
 
 		ASSERT_MSG(numships > 0, order);
-		ASSERT_MSG(numships <= gAP->at(sid).NumShips(), order);
-		ASSERT_MSG(gAP->at(sid).Owner() == 1, order);
+		ASSERT_MSG(numships <= bot::gAP->at(sid).NumShips(), order);
+		ASSERT_MSG(bot::gAP->at(sid).Owner() == 1, order);
 		ASSERT_MSG(tid >= 0 && tid != sid, order);
 		LOG(order);
 		gPW->IssueOrder(sid, tid, numships);
@@ -89,12 +67,13 @@ void IssueOrders(std::vector<Fleet>& orders) {
 	orders.clear();
 }
 
-void DoTurn(PlanetWars& pw, int turn) {
+void DoTurn(PlanetWars& pw) {
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
 	gPW                    = &pw;
-	gAP                    = &AP;
+	bot::gAP               = &AP;
 	std::vector<int>    NPIDX;  // neutral planets
+	std::vector<int>    CNPIDX; // neutral planets that we can capture
 	std::vector<int>    EPIDX;  // enemy planets
 	std::vector<int>    NMPIDX; // not my planets
 	std::vector<int>    MPIDX;  // all planets belonging to us
@@ -104,7 +83,7 @@ void DoTurn(PlanetWars& pw, int turn) {
 	std::vector<int>    EFIDX;  // enemy fleets
 	std::vector<int>    MFIDX;  // my fleets
 
-	Simulator end, sim;
+	Simulator end;
 	end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
 	int myNumShips    = 0;
 	int enemyNumShips = 0;
@@ -117,6 +96,9 @@ void DoTurn(PlanetWars& pw, int turn) {
 		{
 			case 0: 
 			{
+				if (end.GetPlanet(pid).Owner() == 0)
+					CNPIDX.push_back(pid);
+
 				if (end.IsSniped(pid))
 					SPIDX.push_back(pid);
 				else
@@ -157,18 +139,12 @@ void DoTurn(PlanetWars& pw, int turn) {
 			enemyNumShips += f.NumShips();
 		}
 	}
+	std::vector<Fleet> orders;
 
 	Map map(AP);
-	if (turn == 0)
-	{
-		std::vector<Fleet> orders;
-		ASSERT(!MPIDX.empty() && !EPIDX.empty());
-		map.Init(MPIDX.back(), EPIDX.back(), orders);
-		IssueOrders(orders);
-		return;
-	}
+	map.GetOrdersForCaptureableNeutrals(AF, orders, CNPIDX);
+	IssueOrders(orders);
 	std::vector<int>& FLPIDX = map.GetFrontLine();
-	std::vector<Fleet> orders;
 }
 
 // This is just the main game loop that takes care of communicating with the
@@ -182,7 +158,6 @@ int main(int argc, char *argv[]) {
 
 	LOG(argv[0]<<"-E323-"<<VERSION<<" initialized");
 
-	unsigned int turn = 0;
 	std::string current_line;
 	std::string map_data;
 	while (true) {
@@ -195,7 +170,7 @@ int main(int argc, char *argv[]) {
 				PlanetWars pw(map_data);
 				map_data = "";
 				LOG("turn: " << turn);
-				DoTurn(pw, turn);
+				DoTurn(pw);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;
 				pw.FinishTurn();

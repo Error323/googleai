@@ -4,11 +4,9 @@
 #include <algorithm>
 #include <list>
 
-bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
-	if (a.DestinationPlanet() == b.DestinationPlanet())
-		return a.TurnsRemaining() < b.TurnsRemaining();
-	else
-		return a.DestinationPlanet() < b.DestinationPlanet();
+
+namespace sim {
+	#include "Helper.inl"
 }
 
 void Simulator::Start(int totalTurns, 
@@ -43,7 +41,7 @@ void Simulator::Start(int totalTurns,
 		ownershipHistory[p.PlanetID()].push_back(PlanetOwner(p.Owner(), 0, 0, p.NumShips()));
 	}
 
-	sort(AF->begin(), AF->end(), SortOnPlanetAndTurnsLeft);
+	sort(AF->begin(), AF->end(), sim::SortOnPlanetAndTurnsLeft);
 
 	// Begin simulation
 	int turnsTaken = 0;
@@ -90,6 +88,7 @@ void Simulator::Start(int totalTurns,
 			}
 			forces[AF->at(i).Owner()] += AF->at(i).NumShips();
 		}
+		bool impact = false;
 		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
 		{
 			Fleet& ff = AF->at(fleetsWithSameDestAndTurns[j]);
@@ -97,6 +96,7 @@ void Simulator::Start(int totalTurns,
 			if (ff.TurnsRemaining() <= 0)
 			{
 				remove.push_front(index + j);
+				impact = true;
 			}
 		}
 		
@@ -110,38 +110,41 @@ void Simulator::Start(int totalTurns,
 		// If there are more then one force and if all forces are the same
 		// size, the winner is the original planet owner and the new
 		// shipcount is zero
-		int forceBegin = forces.begin()->second;
-		int forceEnd   = (--forces.end())->second;
-		if (forces.size() > 1 && forceBegin >= p.NumShips() && forceBegin == forceEnd)
+		if (impact)
 		{
-			p.NumShips(0);
-		}
-		else
-		{
-			// Determine biggest force
-			int owner = p.Owner();
-			int force = 0;
-			for (std::map<int,int>::iterator j = forces.begin(); j != forces.end(); j++)
+			int forceBegin = forces.begin()->second;
+			int forceEnd   = (--forces.end())->second;
+			if (forces.size() > 1 && forceBegin >= p.NumShips() && forceBegin == forceEnd)
 			{
-				if (j->second >= force)
-				{
-					owner = j->first;
-					force = j->second;
-				}
-			}
-
-			// Change the planet owner to the biggest force and add it
-			if (p.Owner() == owner)
-			{
-				p.AddShips(force);
+				p.NumShips(0);
 			}
 			else
 			{
-				if (force > p.NumShips())
+				// Determine biggest force
+				int owner = p.Owner();
+				int force = 0;
+				for (std::map<int,int>::iterator j = forces.begin(); j != forces.end(); j++)
 				{
-					ChangeOwner(p, owner, turnsTaken, force);
+					if (j->second >= force)
+					{
+						owner = j->first;
+						force = j->second;
+					}
 				}
-				p.NumShips(abs(p.NumShips() - force));
+
+				// Change the planet owner to the biggest force and add it
+				if (p.Owner() == owner)
+				{
+					p.AddShips(force);
+				}
+				else
+				{
+					if (force > p.NumShips())
+					{
+						ChangeOwner(p, owner, turnsTaken, force);
+					}
+					p.NumShips(abs(p.NumShips() - force));
+				}
 			}
 		}
 
