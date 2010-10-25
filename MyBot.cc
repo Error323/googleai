@@ -47,8 +47,10 @@ bool IsSafe(const Planet& target, std::vector<Planet>& ap, std::vector<Fleet>& a
 			source.RemoveShips(source.NumShips());
 		}
 		sim.Start(1, AP, AF);
+		if (sim.IsEnemyPlanet(target.PlanetID()))
+			return false;
 	}
-	return sim.IsMyPlanet(target.PlanetID());
+	return true;
 }
 
 int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
@@ -172,7 +174,9 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<int>& FLPIDX = map.GetFrontLine();
 	std::vector<Fleet> orders;
 
+	// ---------------------------------------------------------------------------
 	LOG("DEFEND");
+	// ---------------------------------------------------------------------------
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[TPIDX[i]];
@@ -196,8 +200,11 @@ void DoTurn(PlanetWars& pw) {
 			source.Backup();
 			sim.Start(enemy.time, AP, AF, false, true);
 			int numShips = sim.GetPlanet(tid).NumShips();
-			numShips = std::min<int>(numShips, source.NumShips());
-			ASSERT(numShips > 0);
+			numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+
+			if (numShips <= 0)
+				continue;
+
 			source.RemoveShips(numShips);
 			Fleet order(1, numShips, sid, tid, dist, dist);
 			AF.push_back(order);
@@ -223,11 +230,81 @@ void DoTurn(PlanetWars& pw) {
 		}
 	}
 
+	// ---------------------------------------------------------------------------
 	LOG("SNIPE");
+	// ---------------------------------------------------------------------------
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[NPIDX[i]];
+		const int tid = target.PlanetID();
+		if (end.IsEnemyPlanet(tid))
+		{
+			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+			bot::gTarget = tid;
+			sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
+			bool success = false;
+			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[NTPIDX[j]];
+				const int sid = source.PlanetID();
+				const int dist = target.Distance(source);
 
+				// not enough ships
+				if (source.NumShips() <= 0)
+					continue;
+
+				// we don't wanna be sniped
+				if (dist <= enemy.time)
+					continue;
+
+				// compute the timeframe in which we would benefit
+				const int timeFrame = target.NumShips() / target.GrowthRate();
+				if (dist-enemy.time >= timeFrame)
+					continue;
+
+				sim.Start(dist, AP, AF, false, true);
+				int numShips =
+					std::min<int>(source.NumShips()-GetRequiredShips(sid, AF,
+					EFIDX), sim.GetPlanet(tid).NumShips()+1);
+
+				if (numShips > 0)
+				{
+					Fleet order(1, numShips, sid, tid, dist, dist);
+					orders.push_back(order);
+					AF.push_back(order);
+					source.Backup();
+					source.RemoveShips(numShips);
+
+					sim.Start(dist, AP, AF, false, true);
+					if (sim.IsMyPlanet(tid))
+					{
+						success = true;
+						break;
+					}
+				}
+			}
+			if (success)
+			{
+				IssueOrders(orders);
+			}
+			else
+			{
+				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+					AP[orders[j].SourcePlanet()].Restore();
+
+				AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+				orders.clear();
+			}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
 	LOG("ATTACK");
+	// ---------------------------------------------------------------------------
 
+	// ---------------------------------------------------------------------------
 	LOG("EXPAND");
+	// ---------------------------------------------------------------------------
 	std::vector<int> MHPIDX(NTPIDX); // planets that have spare ships
 	std::vector<int> eraser;
 
@@ -235,10 +312,10 @@ void DoTurn(PlanetWars& pw) {
 	// to safely capture them...
 	while (end.GetScore() <= 0)
 	{
+		orders.clear();
+
 		if (CNPIDX.empty() || MHPIDX.empty() || EPIDX.empty())
 			break;
-
-		orders.clear();
 
 		int totalShipsToSpare = 0;
 		vec3<double> avgLoc(0.0,0.0,0.0);
@@ -355,7 +432,43 @@ void DoTurn(PlanetWars& pw) {
 	}
 	IssueOrders(orders);
 
+	// ---------------------------------------------------------------------------
 	LOG("FEED");
+	// ---------------------------------------------------------------------------
+	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
+	{
+		Planet& source = AP[NTPIDX[i]];
+		const int sid = source.PlanetID();
+		if (find(FLPIDX.begin(), FLPIDX.end(), sid) != FLPIDX.end())
+			continue;
+
+		bot::gTarget = sid;
+		sort(FLPIDX.begin(), FLPIDX.end(), bot::SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = FLPIDX.size(); j < m; j++)
+		{
+			Planet& target = AP[FLPIDX[j]];
+			const int tid = target.PlanetID();
+			if (sid == tid)
+				continue;
+
+			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
+			Planet& enemy = AP[eid];
+			const int edist = enemy.Distance(target);
+			int numShips = GetStrength(eid, edist, EPIDX) - target.NumShips();
+			numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+
+			if (numShips <= 0)
+				continue;
+
+			const int dist = source.Distance(target);
+			
+			Fleet order(1, numShips, sid, tid, dist, dist);
+			AF.push_back(order);
+			orders.push_back(order);
+			source.RemoveShips(numShips);
+		}
+	}
+	IssueOrders(orders);
 }
 
 // This is just the main game loop that takes care of communicating with the
@@ -381,6 +494,7 @@ int main(int argc, char *argv[]) {
 				PlanetWars pw(map_data);
 				map_data = "";
 				LOG("turn: " << turn);
+				LOG(pw.ToString());
 				DoTurn(pw);
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;
