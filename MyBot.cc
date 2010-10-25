@@ -301,6 +301,42 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("ATTACK");
 	// ---------------------------------------------------------------------------
+	// Select weakest target
+
+	for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+	{
+		Planet& source = AP[FLPIDX[i]];
+		const int sid = source.PlanetID();
+
+		end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+		int weakness = std::numeric_limits<int>::max();
+		int bestTarget = -1;
+		int bestDist = -1;
+		for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
+		{
+			Planet& target = AP[EPIDX[j]];
+			const int tid = target.PlanetID();
+
+			if (end.IsMyPlanet(tid))
+				continue;
+
+			const int dist = target.Distance(source);
+			int strength = GetStrength(tid, dist, EPIDX);
+			if (strength < weakness)
+			{
+				weakness = strength;
+				bestTarget = tid;
+				bestDist = dist;
+			}
+		}
+		int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
+		if (numShips >= weakness)
+		{
+			Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
+			orders.push_back(order);
+		}
+	}
+	IssueOrders(orders);
 
 	// ---------------------------------------------------------------------------
 	LOG("EXPAND");
