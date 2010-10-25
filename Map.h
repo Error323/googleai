@@ -10,12 +10,11 @@ class Map {
 public:
 	Map(std::vector<Planet>&);
 
-	int               GetClosestFrontLinePlanetIdx(const Planet&);
-	int               GetClosestPlanetIdx(const vec3<double>&, const std::vector<int>&);
+	int GetClosestFrontLinePlanetIdx(const Planet&);
+	int GetClosestPlanetIdx(const vec3<double>&, const std::vector<int>&);
 
-	std::vector<int>   GetPlanetIDsInRadius(const vec3<double>&, const std::vector<int>&, const int);
-	void GetOrdersForCaptureableNeutrals(const std::vector<Fleet>&, std::vector<Fleet>&, std::vector<int>);
-	std::vector<int>&  GetFrontLine()													{ return FLPIDX; }
+	std::vector<int>  GetPlanetIDsInRadius(const vec3<double>&, const std::vector<int>&, const int);
+	std::vector<int>& GetFrontLine(){ return FLPIDX; }
 
 private:
 	const std::vector<Planet>& AP; // hard copy of all the planets
@@ -24,9 +23,6 @@ private:
 	std::vector<int>  NPIDX;   // neutral planets
 	std::vector<int>  EPIDX;   // enemy planets
 	std::vector<int>  MPIDX;   // all planets belonging to us
-
-	void Erase(std::vector<int>&, std::vector<int>&);
-	bool IsSafe(const Planet&, std::vector<Planet>&, std::vector<Fleet>&);
 };
 
 #endif

@@ -13,7 +13,6 @@ void Simulator::Start(int totalTurns,
 					std::vector<Planet>& ap, 
 					std::vector<Fleet>& af,
 					bool removeFleets, bool makeCopy) {
-
 	myNumShips = enemyNumShips = 0;
 	std::vector<int> skipPlanets;
 	std::list<unsigned int> remove;
@@ -92,6 +91,7 @@ void Simulator::Start(int totalTurns,
 		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
 		{
 			Fleet& ff = AF->at(fleetsWithSameDestAndTurns[j]);
+			if (makeCopy) LOG("SIM: "<<ff);
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
 			if (ff.TurnsRemaining() <= 0)
 			{
@@ -125,10 +125,19 @@ void Simulator::Start(int totalTurns,
 				int force = 0;
 				for (std::map<int,int>::iterator j = forces.begin(); j != forces.end(); j++)
 				{
-					if (j->second >= force)
+					if (j->second > force)
 					{
 						owner = j->first;
 						force = j->second;
+					}
+				}
+
+				// Subtract other forces
+				for (std::map<int,int>::iterator j = forces.begin(); j != forces.end(); j++)
+				{
+					if (j->first != owner)
+					{
+						force -= j->second;
 					}
 				}
 

@@ -15,4 +15,4 @@ clean:
 	rm -rf MyBot *.o *.txt
 
 zip:
-	zip $(TARGET)-`git describe --tags`.zip *.cc *.h
+	zip $(TARGET)-`git describe --tags`.zip *.cc *.h *.inl

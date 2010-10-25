@@ -30,3 +30,13 @@ bool SortOnPlanetAndTurnsLeft(const Fleet& a, const Fleet& b) {
 	else
 		return a.DestinationPlanet() < b.DestinationPlanet();
 }
+
+void Erase(std::vector<int>& subject, std::vector<int>& eraser) {
+	ASSERT(subject.size() >= eraser.size());
+	sort(eraser.begin(), eraser.end());
+
+	for (int i = eraser.size()-1; i >= 0; i--)
+		subject.erase(subject.begin()+eraser[i]);
+
+	eraser.clear();
+}
