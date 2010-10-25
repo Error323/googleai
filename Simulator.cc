@@ -91,7 +91,6 @@ void Simulator::Start(int totalTurns,
 		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
 		{
 			Fleet& ff = AF->at(fleetsWithSameDestAndTurns[j]);
-			if (makeCopy) LOG("SIM: "<<ff);
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
 			if (ff.TurnsRemaining() <= 0)
 			{
