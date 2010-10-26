@@ -21,38 +21,6 @@ namespace bot {
 	#include "Helper.inl"
 }
 
-bool IsSafe(const Planet& target, std::vector<Planet>& ap, std::vector<Fleet>& af) {
-	ASSERT(target.Owner() == 0);
-	std::vector<Planet> AP(ap);
-	std::vector<Fleet>  AF(af);
-	Simulator sim;
-	// start simulation that all ships available on all planets to this target
-	for (int i = 0; i < MAX_ROUNDS-turn; i++)
-	{
-		for (unsigned int j = 0, m = AP.size(); j < m; j++)
-		{
-			Planet& source = AP[j];
-			if (source.PlanetID() == target.PlanetID())
-				continue;
-
-			if (source.NumShips() <= 0)
-				continue;
-
-			if (source.Owner() == 0)
-				continue;
-
-			const int dist = target.Distance(source);
-			AF.push_back(Fleet(source.Owner(), source.NumShips(),
-				source.PlanetID(), target.PlanetID(), dist, dist));
-			source.RemoveShips(source.NumShips());
-		}
-		sim.Start(1, AP, AF);
-		if (sim.IsEnemyPlanet(target.PlanetID()))
-			return false;
-	}
-	return true;
-}
-
 int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
 	int numShipsRequired = 0;
 	for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
@@ -103,16 +71,12 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<Fleet>  AF = pw.Fleets();
 	gPW                    = &pw;
 	bot::gAP               = &AP;
-	std::vector<int>    NPIDX;  // neutral planets
-	std::vector<int>    CNPIDX; // neutral planets that we can capture
-	std::vector<int>    EPIDX;  // enemy planets
-	std::vector<int>    NMPIDX; // not my planets
-	std::vector<int>    MPIDX;  // all planets belonging to us
-	std::vector<int>    SPIDX;  // planets sniped by the enemy
-	std::vector<int>    TPIDX;  // targetted planets belonging to us
-	std::vector<int>    NTPIDX; // not targetted planets belonging to us
-	std::vector<int>    EFIDX;  // enemy fleets
-	std::vector<int>    MFIDX;  // my fleets
+	std::vector<int> NPIDX;  // neutral planets
+	std::vector<int> EPIDX;  // enemy planets
+	std::vector<int> TPIDX;  // targetted planets belonging to us
+	std::vector<int> NTPIDX; // not targetted planets belonging to us
+	std::vector<int> EFIDX;  // enemy fleets
+	std::vector<int> MFIDX;  // my fleets
 
 	Simulator end, sim;
 	end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
@@ -127,19 +91,14 @@ void DoTurn(PlanetWars& pw) {
 		{
 			case 0: 
 			{
-				if (end.GetPlanet(pid).Owner() == 0)
-					CNPIDX.push_back(pid);
-
 				if (end.IsSniped(pid))
-					SPIDX.push_back(pid);
-				else
+					TPIDX.push_back(pid);
+				else if (!end.IsMyPlanet(pid))
 					NPIDX.push_back(pid);
-				NMPIDX.push_back(pid); 
 			} break;
 
 			case 1: 
 			{
-				MPIDX.push_back(pid);
 				if (end.IsEnemyPlanet(pid))
 					TPIDX.push_back(pid);
 				else
@@ -149,7 +108,6 @@ void DoTurn(PlanetWars& pw) {
 
 			default: 
 			{
-				NMPIDX.push_back(pid); 
 				EPIDX.push_back(pid);
 				enemyNumShips += p.NumShips();
 			} break;
@@ -175,7 +133,7 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<Fleet> orders;
 
 	// ---------------------------------------------------------------------------
-	LOG("DEFEND");
+	LOG("DEFEND"); // defend our planets when possible
 	// ---------------------------------------------------------------------------
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
@@ -231,7 +189,7 @@ void DoTurn(PlanetWars& pw) {
 	}
 
 	// ---------------------------------------------------------------------------
-	LOG("SNIPE");
+	LOG("SNIPE"); // overtake neutral planets captured by the enemy
 	// ---------------------------------------------------------------------------
 	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
@@ -265,7 +223,7 @@ void DoTurn(PlanetWars& pw) {
 				sim.Start(dist, AP, AF, false, true);
 				int numShips =
 					std::min<int>(source.NumShips()-GetRequiredShips(sid, AF,
-					EFIDX), sim.GetPlanet(tid).NumShips()+1);
+					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
 
 				if (numShips > 0)
 				{
@@ -299,10 +257,8 @@ void DoTurn(PlanetWars& pw) {
 	}
 
 	// ---------------------------------------------------------------------------
-	LOG("ATTACK");
+	LOG("ATTACK"); // rage upon our enemy
 	// ---------------------------------------------------------------------------
-	// Select weakest target
-
 	for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 	{
 		Planet& source = AP[FLPIDX[i]];
@@ -330,146 +286,108 @@ void DoTurn(PlanetWars& pw) {
 			}
 		}
 		int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-		if (numShips >= weakness)
+		if (numShips >= weakness && numShips > 0)
 		{
 			Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
+			source.RemoveShips(numShips);
 			orders.push_back(order);
 		}
 	}
 	IssueOrders(orders);
 
 	// ---------------------------------------------------------------------------
-	LOG("EXPAND");
+	LOG("EXPAND"); // when we are losing or drawing
 	// ---------------------------------------------------------------------------
-	std::vector<int> MHPIDX(NTPIDX); // planets that have spare ships
-	std::vector<int> eraser;
-
-	// while there are captureable neutrals left and planets that are able
-	// to safely capture them...
-	while (end.GetScore() <= 0)
+	end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+	if (end.GetScore() <= 0)
 	{
-		orders.clear();
-
-		if (CNPIDX.empty() || MHPIDX.empty() || EPIDX.empty())
-			break;
-
-		int totalShipsToSpare = 0;
+		// 1. Compute the ships to spare wrt closest enemy
+		std::map<int, int> numShipsToSpare;
+		std::vector<int> MHPIDX; // planets that have ships to spare
 		vec3<double> avgLoc(0.0,0.0,0.0);
-		std::map<int,int> shipsToSpare;
-
-		// compute average location of planets that can help in capturing one or
-		// more neutral planets and their ships to spare
-		std::vector<int> marked;
-		for (unsigned int i = 0, n = MHPIDX.size(); i < n; i++)
+		int totalNumShipsToSpare = 0;
+		for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 		{
-			const Planet& p  = AP[MHPIDX[i]];
-			const int eid    = map.GetClosestPlanetIdx(p.Loc(), EPIDX);
-			const Planet& e  = AP[eid];
-			const int radius = p.Distance(e);
-			const std::vector<int> DPIDX = map.GetPlanetIDsInRadius(p.Loc(), MPIDX, radius);
+			Planet& p = AP[NTPIDX[i]];
+			const int pid = p.PlanetID();
+			const int eid = map.GetClosestPlanetIdx(p.Loc(), EPIDX);
+			Planet& e = AP[eid];
+			const int dist = p.Distance(e);
+			int numShips = p.NumShips() - e.NumShips() -
+				GetRequiredShips(pid, AF, EFIDX) + dist*p.GrowthRate();
 
-			// compute the number of ships we can use
-			int numShips = p.NumShips() - e.NumShips();
-			for (unsigned int j = 0, m = DPIDX.size(); j < m; j++)
-			{
-				const Planet& d = AP[DPIDX[j]];
-				if (find(marked.begin(), marked.end(), d.PlanetID()) != marked.end())
-					continue;
-
-				const int dist = p.Distance(d);
-				numShips += (radius-dist)*d.GrowthRate()-GetRequiredShips(d.PlanetID(), AF, EFIDX);
-				marked.push_back(d.PlanetID());
-			}
-
-			numShips = std::min<int>(numShips, p.NumShips()-GetRequiredShips(p.PlanetID(), AF, EFIDX));
+			// assuming enemy makes same computation at turn 0
+			numShips = turn > 0 ? numShips : numShips*2;
+			numShips = std::min<int>(numShips, p.NumShips());
 			if (numShips > 0)
 			{
+				numShipsToSpare[pid] = numShips;
+				totalNumShipsToSpare += numShips;
+				MHPIDX.push_back(pid);
 				avgLoc += p.Loc();
-				totalShipsToSpare += numShips;
-				shipsToSpare[p.PlanetID()] = numShips;
-			}
-			else
-			{
-				eraser.push_back(i);
 			}
 		}
-
-		// erase planets that are not safe to use for capturing
-		bot::Erase(MHPIDX, eraser);
-
 		avgLoc /= MHPIDX.size();
-		
-		// compute weights and values of capturable neutral planets
-		std::vector<int> w; std::vector<double> v;
-		for (unsigned int i = 0, n = CNPIDX.size(); i < n; i++)
+
+		// 2. Filter out candidates wrt numships and enemy
+		std::vector<int> candidates;
+		for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 		{
-			const Planet& p = AP[CNPIDX[i]];
-			w.push_back(p.NumShips() + 1);
-			v.push_back(p.GrowthRate() / (avgLoc - p.Loc()).len2D());
+			Planet& target = AP[NPIDX[i]];
+			if (target.NumShips() + 1 > totalNumShipsToSpare)
+				continue;
+
+			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
+			Planet& e = AP[eid];
+			const int dist = target.Distance(e);
+			std::vector<int> PIRIDX = map.GetPlanetIDsInRadius(target.Loc(), MHPIDX, dist);
+			bot::gTarget = target.PlanetID();
+			sort(PIRIDX.begin(), PIRIDX.end(), bot::SortOnDistanceToTarget);
+			for (unsigned int j = 0, m = PIRIDX.size(); j < m; j++)
+			{
+				
+			}
 		}
 
-		// compute optimal set of planets given ships to spare
-		KnapSack ks(w, v, totalShipsToSpare);
-		std::vector<int>& I = ks.Indices();
+		// 3. Apply binary knapsack algorithm to select the best candidates
+		std::vector<int> w; std::vector<double> v;
+		for (unsigned int i = 0, n = candidates.size(); i < n; i++)
+		{
+			Planet& candidate = AP[candidates[i]];
+			w.push_back(candidate.NumShips() + 1);
+			v.push_back(candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D());
+		}
 
-		// capture the planets from the knapsack
-		std::vector<Fleet>  AF_(AF);
-		std::vector<Planet> AP_(AP);
-		Simulator sim;
+		KnapSack ks(w, v, totalNumShipsToSpare);
+		std::vector<int> I = ks.Indices();
 		for (unsigned int i = 0, n = I.size(); i < n; i++)
 		{
-			const Planet& target = AP_[CNPIDX[I[i]]];
-
-			bot::gTarget = target.PlanetID();
+			Planet& target = AP[candidates[I[i]]];
+			const int tid = target.PlanetID();
+			bot::gTarget = tid;
 			sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
 			for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
 			{
-				sim.Start(MAX_ROUNDS-turn, AP_, AF_, false, true);
-				const Planet& simTarget = sim.GetPlanet(target.PlanetID());
-
-				if (sim.IsMyPlanet(target.PlanetID()) || sim.IsEnemyPlanet(target.PlanetID()))
-					break;
-
-				Planet& source = AP_[MHPIDX[j]];
-				const int numShips = std::min<int>(simTarget.NumShips()+1, shipsToSpare[source.PlanetID()]);
-
-				if (numShips <= 0)
-					break;
-
-				shipsToSpare[source.PlanetID()] -= numShips;
-
+				Planet& source = AP[MHPIDX[j]];
+				const int sid = source.PlanetID();
 				const int dist = target.Distance(source);
-				source.RemoveShips(numShips);
-				Fleet order(1, numShips, source.PlanetID(), target.PlanetID(), dist, dist);
+				int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
+				numShipsToSpare[sid] -= numShips;
+				Fleet order(1, numShips, sid, tid, dist, dist);
 				orders.push_back(order);
-				AF_.push_back(order);
+				AF.push_back(order);
+				source.RemoveShips(numShips);
+
+				// captured
+				if (numShips >= target.NumShips() + 1)
+					break;
 			}
 		}
-
-		// make sure all planets that are captured are safe
-		for (unsigned int i = 0, n = I.size(); i < n; i++)
-		{
-			const Planet& target = AP_[CNPIDX[I[i]]];
-			if (!IsSafe(target, AP_, AF_))
-			{
-				eraser.push_back(I[i]);
-			}
-		}
-
-		// optimal solution found wrt values, capture neutral planets in a greedy
-		// manner wrt distance
-		if (eraser.empty())
-		{
-			break;
-		}
-
-		// erase planets that are not safe to capture
-		bot::Erase(CNPIDX, eraser);
+		IssueOrders(orders);
 	}
-	IssueOrders(orders);
 
 	// ---------------------------------------------------------------------------
-	LOG("FEED");
+	LOG("FEED"); // support the frontline
 	// ---------------------------------------------------------------------------
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 	{
