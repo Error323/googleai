@@ -353,7 +353,7 @@ void DoTurn(PlanetWars& pw) {
 			{
 				Planet& source = AP[PIRIDX[j]];
 				const int mdist2target = target.Distance(source);
-				const bool closer = mdist2target < edist2target;
+				const bool closer = mdist2target <= edist2target;
 				const bool defend = source.NumShips() - GetRequiredShips(source.PlanetID(), AF, EFIDX) > 0;
 				if (closer && defend)
 				{
