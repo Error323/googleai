@@ -322,8 +322,6 @@ void DoTurn(PlanetWars& pw) {
 			int numShips = p.NumShips() - e.NumShips() -
 				GetRequiredShips(pid, AF, EFIDX) + dist*p.GrowthRate();
 
-			// assuming enemy makes same computation at turn 0
-			numShips = turn > 0 ? numShips : numShips*2;
 			numShips = std::min<int>(numShips, p.NumShips());
 			if (numShips > 0 && p.NumShips() > 0)
 			{
@@ -410,18 +408,23 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("FEED"); // support the frontline
 	// ---------------------------------------------------------------------------
+	std::vector<Planet> _AP(AP);
+	std::vector<Fleet>  _AF(AF);
+	end.Start(MAX_ROUNDS-turn, _AP, _AF);
+	Map _map(_AP);
+	std::vector<int>& _FLPIDX = _map.GetFrontLine();
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 	{
 		Planet& source = AP[NTPIDX[i]];
 		const int sid = source.PlanetID();
-		if (find(FLPIDX.begin(), FLPIDX.end(), sid) != FLPIDX.end())
+		if (find(_FLPIDX.begin(), _FLPIDX.end(), sid) != _FLPIDX.end())
 			continue;
 
 		bot::gTarget = sid;
-		sort(FLPIDX.begin(), FLPIDX.end(), bot::SortOnDistanceToTarget);
-		for (unsigned int j = 0, m = FLPIDX.size(); j < m; j++)
+		sort(_FLPIDX.begin(), _FLPIDX.end(), bot::SortOnDistanceToTarget);
+		for (unsigned int j = 0, m = _FLPIDX.size(); j < m; j++)
 		{
-			Planet& target = AP[FLPIDX[j]];
+			Planet& target = AP[_FLPIDX[j]];
 			const int tid = target.PlanetID();
 			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
 			Planet& enemy = AP[eid];
