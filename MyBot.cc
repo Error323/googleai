@@ -189,7 +189,7 @@ void DoTurn(PlanetWars& pw) {
 	}
 
 	// ---------------------------------------------------------------------------
-	LOG("SNIPE"); // overtake neutral planets captured by the enemy
+	LOG("SNIPE"); // overtake neutral planets captured by the enemy RLLY CLOSE
 	// ---------------------------------------------------------------------------
 	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
@@ -213,6 +213,11 @@ void DoTurn(PlanetWars& pw) {
 
 				// we don't wanna be sniped
 				if (dist <= enemy.time)
+					continue;
+
+				// only snipe when we are the closest planet around
+				std::vector<int> EPIRIDX = map.GetPlanetIDsInRadius(target.Loc(), EPIDX, dist);
+				if (!EPIRIDX.empty())
 					continue;
 
 				// compute the timeframe in which we would benefit
@@ -339,13 +344,21 @@ void DoTurn(PlanetWars& pw) {
 
 			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
 			Planet& e = AP[eid];
-			const int dist = target.Distance(e);
-			std::vector<int> PIRIDX = map.GetPlanetIDsInRadius(target.Loc(), MHPIDX, dist);
+			const int edist2target = target.Distance(e);
+			std::vector<int> PIRIDX = map.GetPlanetIDsInRadius(target.Loc(), MHPIDX, edist2target);
 			bot::gTarget = target.PlanetID();
 			sort(PIRIDX.begin(), PIRIDX.end(), bot::SortOnDistanceToTarget);
 			for (unsigned int j = 0, m = PIRIDX.size(); j < m; j++)
 			{
-				
+				Planet& source = AP[PIRIDX[j]];
+				const int mdist2target = target.Distance(source);
+				const bool closer = mdist2target < edist2target;
+				const bool defend = source.NumShips() - GetRequiredShips(source.PlanetID(), AF, EFIDX) > 0;
+				if (closer && defend)
+				{
+					candidates.push_back(target.PlanetID());
+					break;
+				}
 			}
 		}
 
