@@ -291,11 +291,12 @@ void DoTurn(PlanetWars& pw) {
 			}
 		}
 		int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-		if (numShips >= weakness && numShips > 0)
+		if (numShips > weakness && numShips > 0)
 		{
 			Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
 			source.RemoveShips(numShips);
 			orders.push_back(order);
+			AF.push_back(order);
 		}
 	}
 	IssueOrders(orders);
@@ -371,32 +372,36 @@ void DoTurn(PlanetWars& pw) {
 			v.push_back(candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D());
 		}
 
-		KnapSack ks(w, v, totalNumShipsToSpare);
-		std::vector<int> I = ks.Indices();
-		for (unsigned int i = 0, n = I.size(); i < n; i++)
+		if (!candidates.empty() && !MHPIDX.empty())
 		{
-			Planet& target = AP[candidates[I[i]]];
-			const int tid = target.PlanetID();
-			bot::gTarget = tid;
-			sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
-			for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
+			KnapSack ks(w, v, totalNumShipsToSpare);
+			std::vector<int> I = ks.Indices();
+			for (unsigned int i = 0, n = I.size(); i < n; i++)
 			{
-				Planet& source = AP[MHPIDX[j]];
-				const int sid = source.PlanetID();
-				const int dist = target.Distance(source);
-				int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
-				numShipsToSpare[sid] -= numShips;
-				Fleet order(1, numShips, sid, tid, dist, dist);
-				orders.push_back(order);
-				AF.push_back(order);
-				source.RemoveShips(numShips);
+				Planet& target = AP[candidates[I[i]]];
+				const int tid = target.PlanetID();
+				bot::gTarget = tid;
+				sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
+				for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
+				{
+					Planet& source = AP[MHPIDX[j]];
+					const int sid = source.PlanetID();
+					const int dist = target.Distance(source);
+					int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
+					numShips = std::min<int>(numShips, source.NumShips());
+					numShipsToSpare[sid] -= numShips;
+					Fleet order(1, numShips, sid, tid, dist, dist);
+					orders.push_back(order);
+					AF.push_back(order);
+					source.RemoveShips(numShips);
 
-				// captured
-				if (numShips >= target.NumShips() + 1)
-					break;
+					// captured
+					if (numShips >= target.NumShips() + 1)
+						break;
+				}
 			}
+			IssueOrders(orders);
 		}
-		IssueOrders(orders);
 	}
 
 	// ---------------------------------------------------------------------------
@@ -415,9 +420,6 @@ void DoTurn(PlanetWars& pw) {
 		{
 			Planet& target = AP[FLPIDX[j]];
 			const int tid = target.PlanetID();
-			if (sid == tid)
-				continue;
-
 			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
 			Planet& enemy = AP[eid];
 			const int edist = enemy.Distance(target);
