@@ -291,7 +291,7 @@ void DoTurn(PlanetWars& pw) {
 			}
 		}
 		int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-		if (numShips > weakness && numShips > 0)
+		if (numShips > weakness && source.NumShips() > 0 && numShips > 0)
 		{
 			Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
 			source.RemoveShips(numShips);
@@ -325,7 +325,7 @@ void DoTurn(PlanetWars& pw) {
 			// assuming enemy makes same computation at turn 0
 			numShips = turn > 0 ? numShips : numShips*2;
 			numShips = std::min<int>(numShips, p.NumShips());
-			if (numShips > 0)
+			if (numShips > 0 && p.NumShips() > 0)
 			{
 				numShipsToSpare[pid] = numShips;
 				totalNumShipsToSpare += numShips;
@@ -389,6 +389,9 @@ void DoTurn(PlanetWars& pw) {
 					const int dist = target.Distance(source);
 					int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
 					numShips = std::min<int>(numShips, source.NumShips());
+					if (numShips <= 0 || source.NumShips() <= 0)
+						continue;
+
 					numShipsToSpare[sid] -= numShips;
 					Fleet order(1, numShips, sid, tid, dist, dist);
 					orders.push_back(order);
@@ -426,7 +429,7 @@ void DoTurn(PlanetWars& pw) {
 			int numShips = GetStrength(eid, edist, EPIDX) - target.NumShips();
 			numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
 
-			if (numShips <= 0)
+			if (numShips <= 0 || source.NumShips() <= 0)
 				continue;
 
 			const int dist = source.Distance(target);
