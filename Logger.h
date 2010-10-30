@@ -4,6 +4,9 @@
 #include <string>
 #include <fstream>
 #include <sstream>
+#include <cstdio>
+#include <cstdlib>
+#include <execinfo.h>
 
 enum LogLevel {
 	LOG_BASIC,
@@ -115,11 +118,22 @@ class Logger {
 		}                                                                                 \
 	} while (0)
 
+#define BACKTRACE()                                          \
+	do {                                                     \
+		void* addresses[16];                                 \
+		size_t size = backtrace(addresses, 16);              \
+		char** symbols = backtrace_symbols(addresses, size); \
+		for (size_t i = 0; i < size; i++)                    \
+			LOG(symbols[i]);                                 \
+		free(symbols);                                       \
+	} while (0)
+
 #define FATAL(...)                           \
 	do {                                     \
 		char buffer[2048];                   \
 		snprintf(buffer, 2048, __VA_ARGS__); \
 		LOG(buffer);                         \
+		BACKTRACE();                         \
 	} while (0)
 
 #endif

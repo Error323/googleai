@@ -54,9 +54,11 @@ int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EF
 
 int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 	int strength = 0;
+	ASSERT(tid >= 0 && tid < bot::gAP->size());
 	const Planet& target = bot::gAP->at(tid);
 	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
 	{
+		ASSERT(EPIDX[i] >= 0 && EPIDX[i] < bot::gAP->size());
 		const Planet& candidate = bot::gAP->at(EPIDX[i]);
 		int distance = target.Distance(candidate);
 		if (distance < dist)
@@ -77,6 +79,7 @@ void IssueOrders(std::vector<Fleet>& orders) {
 		const int tid = order.DestinationPlanet();
 
 		ASSERT_MSG(numships > 0, order);
+		ASSERT(sid >= 0 && sid < bot::gAP->size());
 		ASSERT_MSG(bot::gAP->at(sid).Owner() == 1, order);
 		ASSERT_MSG(tid >= 0 && tid != sid, order);
 		gPW->IssueOrder(sid, tid, numships);

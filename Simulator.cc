@@ -1,5 +1,4 @@
 #include "Simulator.h"
-#include "Logger.h"
 
 #include <algorithm>
 #include <list>
@@ -46,6 +45,7 @@ void Simulator::Start(int totalTurns,
 	int turnsTaken = 0;
 	for (unsigned int i = 0, n = AF->size(); i < n; i++)
 	{
+		ASSERT(i >= 0 && i < AF->size());
 		Fleet& f = AF->at(i);
 		unsigned int index = i;
 
@@ -73,6 +73,9 @@ void Simulator::Start(int totalTurns,
 
 		// if the next fleet has the same destination planet AND the same
 		// amount of turns remaining, gather all the forces
+		#ifdef DEBUG
+		if (i < n-1) ASSERT(i+1 >= 0 && i+1 < AF->size());
+		#endif
 		while (
 			i < n-1 && 
 			AF->at(i+1).DestinationPlanet() == f.DestinationPlanet() &&
@@ -90,6 +93,7 @@ void Simulator::Start(int totalTurns,
 		bool impact = false;
 		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
 		{
+			ASSERT(fleetsWithSameDestAndTurns[j] >= 0 && fleetsWithSameDestAndTurns[j] < AP->size());
 			Fleet& ff = AF->at(fleetsWithSameDestAndTurns[j]);
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
 			if (ff.TurnsRemaining() <= 0)
@@ -100,6 +104,7 @@ void Simulator::Start(int totalTurns,
 		}
 		
 		// Add ship growth for non-neutral planets
+		ASSERT(f.DestinationPlanet() >= 0 && f.DestinationPlanet() < AP->size());
 		Planet& p = AP->at(f.DestinationPlanet());
 		if (p.Owner() > 0)
 		{

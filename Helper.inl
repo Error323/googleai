@@ -2,14 +2,19 @@ const std::vector<Planet>* gAP     = NULL;
 int                        gTarget = 0;
 
 inline bool SortOnGrowthRate(const int pidA, const int pidB) {
+	ASSERT(pidA >= 0 && pidA < gAP->size());
 	const Planet& a = gAP->at(pidA);
+	ASSERT(pidB >= 0 && pidB < gAP->size());
 	const Planet& b = gAP->at(pidB);
 	return a.GrowthRate() > b.GrowthRate();
 }
 
 inline bool SortOnDistanceToTarget(const int pidA, const int pidB) {
+	ASSERT(gTarget >= 0 && gTarget < gAP->size());
 	const Planet& t = gAP->at(gTarget);
+	ASSERT(pidA >= 0 && pidA < gAP->size());
 	const Planet& a = gAP->at(pidA);
+	ASSERT(pidB >= 0 && pidB < gAP->size());
 	const Planet& b = gAP->at(pidB);
 	const int distA = a.Distance(t);
 	const int distB = b.Distance(t);
@@ -17,7 +22,9 @@ inline bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 }
 
 inline bool SortOnDistanceToEnemy(const int pidA, const int pidB) {
+	ASSERT(pidA >= 0 && pidA < gAP->size());
 	const Planet& a = gAP->at(pidA);
+	ASSERT(pidB >= 0 && pidB < gAP->size());
 	const Planet& b = gAP->at(pidB);
 	int dista = 1000000;
 	int distb = 1000000;
@@ -39,7 +46,9 @@ inline bool SortOnDistanceToEnemy(const int pidA, const int pidB) {
 }
 
 inline bool SortOnGrowthShipRatio(const int pidA, const int pidB) {
+	ASSERT(pidA >= 0 && pidA < gAP->size());
 	const Planet& a = gAP->at(pidA);
+	ASSERT(pidB >= 0 && pidB < gAP->size());
 	const Planet& b = gAP->at(pidB);
 	const double growA = a.GrowthRate() / (1.0*a.NumShips() + 1.0);
 	const double growB = b.GrowthRate() / (1.0*b.NumShips() + 1.0);
