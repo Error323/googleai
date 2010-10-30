@@ -60,6 +60,34 @@ Map::Map(std::vector<Planet>& ap): AP(ap) {
 			FLPIDX.push_back(i->second);
 		}
 	}
+
+	for (unsigned int i = 0, n = MPIDX.size(); i < n; i++)
+	{
+		const Planet& p = AP[MPIDX[i]];
+		const int pid = p.PlanetID();
+
+		if (find(FLPIDX.begin(), FLPIDX.end(), pid) != FLPIDX.end())
+			continue;
+
+		const int eid = GetClosestPlanetIdx(p.Loc(), EPIDX);
+		const int mid = GetClosestPlanetIdx(p.Loc(), MPIDX);
+		int edist = std::numeric_limits<int>::max();
+		int mdist = std::numeric_limits<int>::max();
+		if (eid != -1)
+		{
+			edist = p.Distance(AP[eid]);
+		}
+
+		if (mid != -1)
+		{
+			mdist = p.Distance(AP[mid]);
+		}
+
+		if (edist <= mdist)
+		{
+			FLPIDX.push_back(pid);
+		}
+	}
 }
 
 int Map::GetClosestFrontLinePlanetIdx(const Planet& p) {
@@ -99,7 +127,7 @@ int Map::GetClosestPlanetIdx(const vec3<double>& pos, const std::vector<int>& ca
 	{
 		const Planet& p = AP[candidates[i]];
 		const int dist = (pos - p.Loc()).len2D();
-		if (dist < closestDist)
+		if (pos != p.Loc() && dist < closestDist)
 		{
 			closestDist = dist;
 			pid = p.PlanetID();

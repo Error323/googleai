@@ -32,7 +32,10 @@ inline bool SortOnDistanceToEnemy(const int pidA, const int pidB) {
 			distb = std::min<int>(distb, db);
 		}
 	}
-	return dista < distb;
+	if (dista == distb)
+		return a.GrowthRate() > b.GrowthRate();
+	else
+		return dista < distb;
 }
 
 inline bool SortOnGrowthShipRatio(const int pidA, const int pidB) {

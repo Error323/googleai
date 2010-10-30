@@ -15,7 +15,7 @@
 
 PlanetWars* gPW      = NULL;
 int turn             = 0;
-int MAX_ROUNDS       = 200;
+int MAX_TURNS       = 200;
 
 namespace bot {
 	#include "Helper.inl"
@@ -79,7 +79,7 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<int> MFIDX;  // my fleets
 
 	Simulator end, sim;
-	end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+	end.Start(MAX_TURNS-turn, AP, AF, false, true);
 	int myNumShips    = 0;
 	int enemyNumShips = 0;
 
@@ -217,7 +217,7 @@ void DoTurn(PlanetWars& pw) {
 
 				// only snipe when we are the closest planet around
 				std::vector<int> EPIRIDX = map.GetPlanetIDsInRadius(target.Loc(), EPIDX, dist);
-				if (!EPIRIDX.empty())
+				if (end.GetScore() < 0 && !EPIRIDX.empty())
 					continue;
 
 				// compute the timeframe in which we would benefit
@@ -269,7 +269,7 @@ void DoTurn(PlanetWars& pw) {
 		Planet& source = AP[FLPIDX[i]];
 		const int sid = source.PlanetID();
 
-		end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+		end.Start(MAX_TURNS-turn, AP, AF, false, true);
 		int weakness = std::numeric_limits<int>::max();
 		int bestTarget = -1;
 		int bestDist = -1;
@@ -291,7 +291,7 @@ void DoTurn(PlanetWars& pw) {
 			}
 		}
 		int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-		if (numShips > weakness && source.NumShips() > 0 && numShips > 0)
+		if (numShips > weakness && numShips > 0)
 		{
 			Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
 			source.RemoveShips(numShips);
@@ -304,7 +304,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("EXPAND"); // when we are losing or drawing
 	// ---------------------------------------------------------------------------
-	end.Start(MAX_ROUNDS-turn, AP, AF, false, true);
+	end.Start(MAX_TURNS-turn, AP, AF, false, true);
 	if (end.GetScore() <= 0)
 	{
 		// 1. Compute the ships to spare wrt closest enemy
@@ -410,7 +410,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	std::vector<Planet> _AP(AP);
 	std::vector<Fleet>  _AF(AF);
-	end.Start(MAX_ROUNDS-turn, _AP, _AF);
+	end.Start(MAX_TURNS-turn, _AP, _AF);
 	Map _map(_AP);
 	std::vector<int>& _FLPIDX = _map.GetFrontLine();
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
