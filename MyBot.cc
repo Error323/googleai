@@ -394,9 +394,9 @@ void DoTurn(PlanetWars& pw) {
 		{
 			Planet& candidate = AP[candidates[i]];
 			w.push_back(candidate.NumShips() + 1);
-			double value = candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D();
-			//const int dist = (avgLoc - candidate.Loc()).len2D();
-			//double value = std::numeric_limits<double>::max() / (candidate.NumShips() / (candidate.GrowthRate() + 1.0) + log(pow(2, dist)));
+			//double value = candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D();
+			const int dist = (avgLoc - candidate.Loc()).len2D();
+			double value = std::numeric_limits<double>::max() / (candidate.NumShips() / (candidate.GrowthRate() + 1.0) + log(pow(2, dist)));
 			v.push_back(value);
 			PQ.push(NPV(candidate.PlanetID(), value));
 		}
