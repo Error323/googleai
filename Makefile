@@ -1,18 +1,19 @@
 DEBUG=-g -DDEBUG
-CC=g++ -m32 $(DEBUG)
-CFLAGS=-Wall -Wextra -O2 $(DEBUG)
+CC=g++ #$(DEBUG)
+CFLAGS=-Wall -Wextra -O2 -march=core2 #$(DEBUG)
 
 OBJECTS=MyBot.o Logger.o vec3.o PlanetWars.o Simulator.o Map.o KnapSack.o
-TARGET=MyBot
+VERSION=`git describe --tags`
+TARGET=E323
 
 $(TARGET): $(OBJECTS)
-	$(CC) $(OBJECTS) -o $@
+	$(CC) $(OBJECTS) -o $(TARGET)-$(VERSION)
 
 %.o: %.cc
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -rf MyBot *.o *.txt
+	rm -rf $(TARGET)* *.o *.txt
 
 zip:
-	zip $(TARGET)-`git describe --tags`.zip *.cc *.h *.inl
+	zip $(TARGET)-$(VERSION).zip *.cc *.h
