@@ -532,10 +532,18 @@ void DoTurn(PlanetWars& pw) {
 			Planet& target = AP[_FLPIDX[j]];
 			const int tid = target.PlanetID();
 			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
-			Planet& enemy = AP[eid];
-			const int edist = enemy.Distance(target);
-			int numShips = GetStrength(eid, edist, EPIDX) - target.NumShips();
-			numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+			int numShips = 0;
+			if (eid != -1)
+			{
+				Planet& enemy = AP[eid];
+				const int edist = enemy.Distance(target);
+				numShips = GetStrength(eid, edist, EPIDX) - target.NumShips();
+				numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+			}
+			else
+			{
+				numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+			}
 
 			if (numShips <= 0 || source.NumShips() <= 0)
 				continue;
