@@ -312,7 +312,8 @@ void DoTurn(PlanetWars& pw) {
 				}
 			}
 			int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-			if (numShips > weakness && numShips > 0)
+			sim.Start(bestDist, AP, AF, false, true);
+			if (numShips > sim.GetPlanet(bestTarget).NumShips() && numShips > 0)
 			{
 				Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
 				source.RemoveShips(numShips);
@@ -425,6 +426,7 @@ void DoTurn(PlanetWars& pw) {
 						Fleet order(1, numShips, sid, tid, dist, dist);
 						orders.push_back(order);
 						AF.push_back(order);
+						source.Backup();
 						source.RemoveShips(numShips);
 						sim.Start(dist, AP, AF, false, true);
 
@@ -465,13 +467,13 @@ void DoTurn(PlanetWars& pw) {
 						const int dist = target.Distance(source);
 						int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
 						numShips = std::min<int>(numShips, source.NumShips() - GetRequiredShips(sid, AF, EFIDX));
-						if (numShips <= 0 || source.NumShips() <= 0)
+						if (numShips <= 0)
 							continue;
 
-						numShipsToSpare[sid] -= numShips;
 						Fleet order(1, numShips, sid, tid, dist, dist);
 						orders.push_back(order);
 						AF.push_back(order);
+						source.Backup();
 						source.RemoveShips(numShips);
 						sim.Start(dist, AP, AF, false, true);
 
