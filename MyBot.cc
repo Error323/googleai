@@ -10,6 +10,7 @@
 #include <limits>
 #include <cmath>
 #include <string>
+#include <queue>
 
 #ifdef DEBUG
 	#include <sys/types.h>
@@ -27,6 +28,16 @@ int MAX_TURNS   = 200;
 namespace bot {
 	#include "Helper.inl"
 }
+
+struct NPV {
+	NPV(): id(-1), val(-1.0) {}
+	NPV(int pid, double v): id(pid), val(v) {}
+	int id;
+	double val;
+	bool operator< (const NPV& npv) const {
+		return val < npv.val;
+	}
+};
 
 int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
 	int numShipsRequired = 0;
@@ -272,42 +283,45 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("ATTACK"); // rage upon our enemy
 	// ---------------------------------------------------------------------------
-	for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+	if (end.GetScore() >= 0)
 	{
-		Planet& source = AP[FLPIDX[i]];
-		const int sid = source.PlanetID();
-
-		end.Start(MAX_TURNS-turn, AP, AF, false, true);
-		int weakness = std::numeric_limits<int>::max();
-		int bestTarget = -1;
-		int bestDist = -1;
-		for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
+		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 		{
-			Planet& target = AP[EPIDX[j]];
-			const int tid = target.PlanetID();
+			Planet& source = AP[FLPIDX[i]];
+			const int sid = source.PlanetID();
 
-			if (end.IsMyPlanet(tid))
-				continue;
-
-			const int dist = target.Distance(source);
-			int strength = GetStrength(tid, dist, EPIDX);
-			if (strength < weakness)
+			end.Start(MAX_TURNS-turn, AP, AF, false, true);
+			int weakness = std::numeric_limits<int>::max();
+			int bestTarget = -1;
+			int bestDist = -1;
+			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
 			{
-				weakness = strength;
-				bestTarget = tid;
-				bestDist = dist;
+				Planet& target = AP[EPIDX[j]];
+				const int tid = target.PlanetID();
+
+				if (end.IsMyPlanet(tid))
+					continue;
+
+				const int dist = target.Distance(source);
+				int strength = GetStrength(tid, dist, EPIDX);
+				if (strength < weakness)
+				{
+					weakness = strength;
+					bestTarget = tid;
+					bestDist = dist;
+				}
+			}
+			int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
+			if (numShips > weakness && numShips > 0)
+			{
+				Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
+				source.RemoveShips(numShips);
+				orders.push_back(order);
+				AF.push_back(order);
 			}
 		}
-		int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-		if (numShips > weakness && numShips > 0)
-		{
-			Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
-			source.RemoveShips(numShips);
-			orders.push_back(order);
-			AF.push_back(order);
-		}
+		IssueOrders(orders);
 	}
-	IssueOrders(orders);
 
 	// ---------------------------------------------------------------------------
 	LOG("EXPAND"); // when we are losing or drawing
@@ -371,45 +385,116 @@ void DoTurn(PlanetWars& pw) {
 
 		// 3. Apply binary knapsack algorithm to select the best candidates
 		std::vector<int> w; std::vector<double> v;
+		std::priority_queue<NPV> PQ;
 		for (unsigned int i = 0, n = candidates.size(); i < n; i++)
 		{
 			Planet& candidate = AP[candidates[i]];
 			w.push_back(candidate.NumShips() + 1);
-			v.push_back(candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D());
+			double value = candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D();
+			//const int dist = (avgLoc - candidate.Loc()).len2D();
+			//double value = std::numeric_limits<double>::max() / (candidate.NumShips() / (candidate.GrowthRate() + 1.0) + log(pow(2, dist)));
+			v.push_back(value);
+			PQ.push(NPV(candidate.PlanetID(), value));
 		}
 
 		if (!candidates.empty() && !MHPIDX.empty())
 		{
-			KnapSack ks(w, v, totalNumShipsToSpare);
-			std::vector<int> I = ks.Indices();
-			for (unsigned int i = 0, n = I.size(); i < n; i++)
+			// use the knapsack algorithm on turn 0
+			if (turn == 0)
 			{
-				Planet& target = AP[candidates[I[i]]];
-				const int tid = target.PlanetID();
-				bot::gTarget = tid;
-				sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
-				for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
+				KnapSack ks(w, v, totalNumShipsToSpare);
+				std::vector<int> I = ks.Indices();
+				for (unsigned int i = 0, n = I.size(); i < n; i++)
 				{
-					Planet& source = AP[MHPIDX[j]];
-					const int sid = source.PlanetID();
-					const int dist = target.Distance(source);
-					int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
-					numShips = std::min<int>(numShips, source.NumShips());
-					if (numShips <= 0 || source.NumShips() <= 0)
-						continue;
+					Planet& target = AP[candidates[I[i]]];
+					const int tid = target.PlanetID();
+					bot::gTarget = tid;
+					bool success = true;
+					sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
+					for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
+					{
+						Planet& source = AP[MHPIDX[j]];
+						const int sid = source.PlanetID();
+						const int dist = target.Distance(source);
+						int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
+						numShips = std::min<int>(numShips, source.NumShips() - GetRequiredShips(sid, AF, EFIDX));
+						if (numShips <= 0 || source.NumShips() <= 0)
+							continue;
 
-					numShipsToSpare[sid] -= numShips;
-					Fleet order(1, numShips, sid, tid, dist, dist);
-					orders.push_back(order);
-					AF.push_back(order);
-					source.RemoveShips(numShips);
+						numShipsToSpare[sid] -= numShips;
+						Fleet order(1, numShips, sid, tid, dist, dist);
+						orders.push_back(order);
+						AF.push_back(order);
+						source.RemoveShips(numShips);
+						sim.Start(dist, AP, AF, false, true);
 
-					// captured
-					if (numShips >= target.NumShips() + 1)
-						break;
+						if (sim.IsMyPlanet(tid))
+						{
+							success = true;
+							break;
+						}
+					}
+					if (success)
+					{
+						IssueOrders(orders);
+					}
+					else
+					{
+						for (unsigned int j = 0, m = orders.size(); j < m; j++)
+							AP[orders[j].SourcePlanet()].Restore();
+
+						AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+						orders.clear();
+					}
 				}
 			}
-			IssueOrders(orders);
+
+			// otherwise wait until we can cap the best neutral
+			else
+			{
+				Planet& target = AP[PQ.top().id];
+				const int tid = target.PlanetID();
+				if (totalNumShipsToSpare >= target.NumShips() + 1)
+				{
+					bool success = false;
+					sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
+					for (unsigned int i = 0, n = MHPIDX.size(); i < n; i++)
+					{
+						Planet& source = AP[MHPIDX[i]];
+						const int sid = source.PlanetID();
+						const int dist = target.Distance(source);
+						int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
+						numShips = std::min<int>(numShips, source.NumShips() - GetRequiredShips(sid, AF, EFIDX));
+						if (numShips <= 0 || source.NumShips() <= 0)
+							continue;
+
+						numShipsToSpare[sid] -= numShips;
+						Fleet order(1, numShips, sid, tid, dist, dist);
+						orders.push_back(order);
+						AF.push_back(order);
+						source.RemoveShips(numShips);
+						sim.Start(dist, AP, AF, false, true);
+
+						if (sim.IsMyPlanet(tid))
+						{
+							success = true;
+							break;
+						}
+					}
+					if (success)
+					{
+						IssueOrders(orders);
+					}
+					else
+					{
+						for (unsigned int j = 0, m = orders.size(); j < m; j++)
+							AP[orders[j].SourcePlanet()].Restore();
+
+						AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+						orders.clear();
+					}
+				}
+			}
 		}
 	}
 
