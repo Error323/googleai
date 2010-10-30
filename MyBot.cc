@@ -11,11 +11,18 @@
 #include <cmath>
 #include <string>
 
+#ifdef DEBUG
+	#include <sys/types.h>
+	#include <unistd.h>
+	#include <signal.h>
+#endif
+
+
 #define VERSION "13.0"
 
-PlanetWars* gPW      = NULL;
-int turn             = 0;
-int MAX_TURNS       = 200;
+PlanetWars* gPW = NULL;
+int turn        = 0;
+int MAX_TURNS   = 200;
 
 namespace bot {
 	#include "Helper.inl"
@@ -135,6 +142,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("DEFEND"); // defend our planets when possible
 	// ---------------------------------------------------------------------------
+	sort(TPIDX.begin(), TPIDX.end(), bot::SortOnDistanceToEnemy);
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[TPIDX[i]];
@@ -446,16 +454,27 @@ void DoTurn(PlanetWars& pw) {
 	IssueOrders(orders);
 }
 
+#ifdef DEBUG
+void SigHandler(int signum) {
+	Logger logger(std::string(VERSION) + "-crash.txt");
+	logger.Log(gPW->ToString());
+	signal(signum, SIG_DFL);
+	kill(getpid(), signum);
+}
+#endif
+
 // This is just the main game loop that takes care of communicating with the
 // game engine for you. You don't have to understand or change the code below.
 int main(int argc, char *argv[]) {
 	(void) argc;
 	(void) argv;
 
-	Logger logger(std::string(argv[0]) + "-E323-" + VERSION + ".txt");
+#ifdef DEBUG
+	signal(SIGSEGV, SigHandler);
+	Logger logger(std::string(argv[0]) + ".txt");
 	Logger::SetLogger(&logger);
-
-	LOG(argv[0]<<"-E323-"<<VERSION<<" initialized");
+	LOG(argv[0]<<" initialized");
+#endif
 
 	std::string current_line;
 	std::string map_data;
