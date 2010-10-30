@@ -19,7 +19,7 @@
 #endif
 
 
-#define VERSION "13.0"
+#define VERSION "14.0"
 
 PlanetWars* gPW = NULL;
 int turn        = 0;
