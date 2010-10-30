@@ -425,6 +425,8 @@ void DoTurn(PlanetWars& pw) {
 						if (numShips <= 0 || source.NumShips() <= 0)
 							continue;
 
+						sim.Start(dist, AP, AF, false, true);
+						numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShips);
 						numShipsToSpare[sid] -= numShips;
 						Fleet order(1, numShips, sid, tid, dist, dist);
 						orders.push_back(order);
@@ -474,6 +476,8 @@ void DoTurn(PlanetWars& pw) {
 						if (numShips <= 0)
 							continue;
 
+						sim.Start(dist, AP, AF, false, true);
+						numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShips);
 						Fleet order(1, numShips, sid, tid, dist, dist);
 						orders.push_back(order);
 						AF.push_back(order);
