@@ -283,7 +283,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("ATTACK"); // rage upon our enemy
 	// ---------------------------------------------------------------------------
-	if (end.GetScore() >= 0)
+	if (end.GetScore() >= 0 && !EPIDX.empty())
 	{
 		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 		{
@@ -311,14 +311,17 @@ void DoTurn(PlanetWars& pw) {
 					bestDist = dist;
 				}
 			}
-			int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
-			sim.Start(bestDist, AP, AF, false, true);
-			if (numShips > sim.GetPlanet(bestTarget).NumShips() && numShips > 0)
+			if (bestTarget != -1)
 			{
-				Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
-				source.RemoveShips(numShips);
-				orders.push_back(order);
-				AF.push_back(order);
+				int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
+				sim.Start(bestDist, AP, AF, false, true);
+				if (numShips > 0 && numShips > sim.GetPlanet(bestTarget).NumShips())
+				{
+					Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
+					source.RemoveShips(numShips);
+					orders.push_back(order);
+					AF.push_back(order);
+				}
 			}
 		}
 		IssueOrders(orders);
@@ -451,7 +454,7 @@ void DoTurn(PlanetWars& pw) {
 				}
 			}
 
-			// otherwise wait until we can cap the best neutral
+			// otherwise cap the best neutral if possible
 			else
 			{
 				Planet& target = AP[PQ.top().id];
@@ -459,6 +462,7 @@ void DoTurn(PlanetWars& pw) {
 				if (totalNumShipsToSpare >= target.NumShips() + 1)
 				{
 					bool success = false;
+					bot::gTarget = tid;
 					sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
 					for (unsigned int i = 0, n = MHPIDX.size(); i < n; i++)
 					{
@@ -537,6 +541,30 @@ void DoTurn(PlanetWars& pw) {
 			orders.push_back(order);
 			source.RemoveShips(numShips);
 		}
+	}
+	IssueOrders(orders);
+
+	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
+	{
+		Planet& source = AP[NTPIDX[i]];
+		const int sid = source.PlanetID();
+		if (find(_FLPIDX.begin(), _FLPIDX.end(), sid) != _FLPIDX.end())
+			continue;
+
+		const int tid = map.GetClosestPlanetIdx(source.Loc(), _FLPIDX);
+		if (tid == -1)
+			continue;
+
+		Planet& target = AP[tid];
+		const int dist = target.Distance(source);
+		const int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
+		if (numShips <= 0)
+			continue;
+
+		Fleet order(1, numShips, sid, tid, dist, dist);
+		AF.push_back(order);
+		orders.push_back(order);
+		source.RemoveShips(numShips);
 	}
 	IssueOrders(orders);
 }
