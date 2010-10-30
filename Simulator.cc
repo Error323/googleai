@@ -19,8 +19,8 @@ void Simulator::Start(int totalTurns,
 
 	if (makeCopy)
 	{
-		_AP.resize(ap.size());
-		_AF.resize(af.size());
+		_AP.clear();
+		_AF.clear();
 		_AP = ap;
 		_AF = af;
 		AP = &_AP;

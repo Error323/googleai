@@ -158,9 +158,9 @@ void DoTurn(PlanetWars& pw) {
 	{
 		Planet& target = AP[TPIDX[i]];
 		const int tid = target.PlanetID();
-		bot::gTarget = tid;
 
 		Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+		bot::gTarget = tid;
 		sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
 		bool success = false;
 		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
@@ -283,7 +283,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("ATTACK"); // rage upon our enemy
 	// ---------------------------------------------------------------------------
-	if (end.GetScore() >= 0 && !EPIDX.empty())
+	if (/*end.GetScore() >= 0 &&*/ !EPIDX.empty())
 	{
 		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 		{
@@ -412,8 +412,8 @@ void DoTurn(PlanetWars& pw) {
 				{
 					Planet& target = AP[candidates[I[i]]];
 					const int tid = target.PlanetID();
-					bot::gTarget = tid;
 					bool success = true;
+					bot::gTarget = tid;
 					sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
 					for (unsigned int j = 0, m = MHPIDX.size(); j < m; j++)
 					{

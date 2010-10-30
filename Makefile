@@ -16,4 +16,4 @@ clean:
 	rm -rf $(TARGET)* *.o *.txt
 
 zip:
-	zip $(TARGET)-$(VERSION).zip *.cc *.h
+	zip $(TARGET)-$(VERSION).zip *.cc *.h *.inl
