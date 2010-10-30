@@ -93,7 +93,7 @@ void Simulator::Start(int totalTurns,
 		bool impact = false;
 		for (unsigned int j = 0, m = fleetsWithSameDestAndTurns.size(); j < m; j++)
 		{
-			ASSERT(fleetsWithSameDestAndTurns[j] >= 0 && fleetsWithSameDestAndTurns[j] < AP->size());
+			ASSERT(fleetsWithSameDestAndTurns[j] >= 0 && fleetsWithSameDestAndTurns[j] < AF->size());
 			Fleet& ff = AF->at(fleetsWithSameDestAndTurns[j]);
 			ff.TurnsRemaining(ff.TurnsRemaining()-turnsTaken);
 			if (ff.TurnsRemaining() <= 0)
