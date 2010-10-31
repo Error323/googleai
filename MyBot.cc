@@ -549,47 +549,46 @@ void DoTurn(PlanetWars& pw) {
 			{
 				Planet& target = AP[PQ.top().id];
 				const int tid = target.PlanetID();
-				if (totalNumShipsToSpare >= target.NumShips() + 1)
+				bool success = false;
+				bot::gTarget = tid;
+				sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
+				for (unsigned int i = 0, n = MHPIDX.size(); i < n; i++)
 				{
-					bool success = false;
-					bot::gTarget = tid;
-					sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
-					for (unsigned int i = 0, n = MHPIDX.size(); i < n; i++)
-					{
-						Planet& source = AP[MHPIDX[i]];
-						const int sid = source.PlanetID();
-						const int dist = target.Distance(source);
-						sim.Start(dist, AP, AF, false, true);
-						int numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShipsToSpare[sid]);
-						numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, AF, EFIDX));
-						if (numShips <= 0)
-							continue;
+					Planet& source = AP[MHPIDX[i]];
+					const int sid = source.PlanetID();
+					const int dist = target.Distance(source);
+					sim.Start(dist, AP, AF, false, true);
+					int numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShipsToSpare[sid]);
+					numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, AF, EFIDX));
+					if (numShips <= 0)
+						continue;
 
-						Fleet order(1, numShips, sid, tid, dist, dist);
-						orders.push_back(order);
-						AF.push_back(order);
-						source.Backup();
-						source.RemoveShips(numShips);
-						sim.Start(dist, AP, AF, false, true);
+					Fleet order(1, numShips, sid, tid, dist, dist);
+					orders.push_back(order);
+					AF.push_back(order);
+					source.Backup();
+					source.RemoveShips(numShips);
+					sim.Start(dist, AP, AF, false, true);
 
-						if (sim.IsMyPlanet(tid))
-						{
-							success = true;
-							break;
-						}
-					}
-					if (success)
+					if (sim.IsMyPlanet(tid))
 					{
-						IssueOrders(orders);
+						success = true;
+						break;
 					}
-					else
-					{
-						for (unsigned int j = 0, m = orders.size(); j < m; j++)
-							AP[orders[j].SourcePlanet()].Restore();
+				}
+				if (success)
+				{
+					IssueOrders(orders);
+				}
+				else
+				{
+					for (unsigned int j = 0, m = orders.size(); j < m; j++)
+						AP[orders[j].SourcePlanet()].Restore();
 
-						AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
-						orders.clear();
-					}
+					AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+					orders.clear();
+					int sid = map.GetClosestPlanetIdx(target.Loc(), MHPIDX);
+					AP[sid].NumShips(0);
 				}
 			}
 		}
