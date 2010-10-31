@@ -21,6 +21,8 @@
 
 #define VERSION "14.0"
 
+#define EPS 1.0e-10
+
 PlanetWars* gPW = NULL;
 int turn        = 0;
 int MAX_TURNS   = 200;
@@ -39,7 +41,13 @@ struct NPV {
 	}
 };
 
-int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
+double GetValue(Planet& p, int dist) {
+	double nom = std::numeric_limits<double>::max();
+	double denom = (p.NumShips() / (p.GrowthRate() + EPS) + log(pow(2.0, dist)));
+	return nom / denom;
+}
+
+int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
 	int numShipsRequired = 0;
 	for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
 	{
@@ -50,6 +58,35 @@ int GetRequiredShips(const int sid, std::vector<Fleet>& AF, std::vector<int>& EF
 		}
 	}
 	return numShipsRequired;
+}
+
+int GetStrength(const int tid, const int dist, std::vector<Planet>& ap, std::vector<Fleet>& af) {
+	std::vector<Planet> AP(ap);
+	std::vector<Fleet>  AF(af);
+	Planet& target = AP[tid];
+	const int tOwner = target.Owner();
+
+	Simulator sim;
+	for (int i = 0; i < dist; i++)
+	{
+		for (unsigned int i = 0, n = AP.size(); i < n; i++)
+		{
+			Planet& source = AP[i];
+			const int sid = source.PlanetID();
+			const int sOwner = source.Owner();
+			if (tOwner != sOwner || sid == tid)
+				continue;
+
+			const int distance = target.Distance(source);
+			if (distance <= dist)
+			{
+				Fleet order(tOwner, source.NumShips(), sid, tid, dist, dist);
+				AF.push_back(order);
+			}
+		}
+		sim.Start(1, AP, AF);
+	}
+	return target.NumShips();
 }
 
 int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
@@ -68,6 +105,52 @@ int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 		}
 	}
 	return strength;
+}
+
+int GetWeakness(const int tid, const int dist, std::vector<int>& EPIDX) {
+	int weakness = 0;
+	const Planet& target = bot::gAP->at(tid);
+	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
+	{
+		const Planet& candidate = bot::gAP->at(EPIDX[i]);
+		int distance = target.Distance(candidate);
+		if (distance > dist)
+		{
+			weakness++;
+		}
+	}
+	return weakness;
+}
+
+int GetHub(const int sid, const int tid) {
+	#define BETWEEN(v, a, b) ((v > a && v < b) || (v < a && v > b))
+	int hid = tid;
+	const Planet& source = bot::gAP->at(sid);
+	const Planet& target = bot::gAP->at(tid);
+	vec3<double> vecTarget = target.Loc() - source.Loc();
+	double distance = vecTarget.len2D();
+	for (unsigned int i = 0, n = bot::gAP->size(); i < n; i++)
+	{
+		const Planet& hub = bot::gAP->at(i);
+		if (hub.Owner() == source.Owner() && hub.PlanetID() != tid && hub.PlanetID() != sid)
+		{
+			vec3<double> vecHub = hub.Loc() - source.Loc();
+			vec3<double> vecProjectHub = vecHub.project(vecTarget);
+			if (BETWEEN(vecProjectHub.x, 0.0, vecTarget.x) && BETWEEN(vecProjectHub.z, 0.0, vecTarget.z))
+			{
+				// overstaande = acos(aanliggende / schuine)
+				const double hLength = vecHub.len2D();
+				const double pLength = vecProjectHub.len2D();
+				const double deviation = sqrt(hLength*hLength - pLength*pLength);
+				if (pLength < distance && deviation < 1.5)
+				{
+					hid = hub.PlanetID();
+					distance = pLength;
+				}
+			}
+		}
+	}
+	return hid;
 }
 
 void IssueOrders(std::vector<Fleet>& orders) {
@@ -112,6 +195,9 @@ void DoTurn(PlanetWars& pw) {
 		{
 			case 0: 
 			{
+				if (p.GrowthRate() == 0)
+					continue;
+
 				if (end.IsSniped(pid))
 					TPIDX.push_back(pid);
 				else if (!end.IsMyPlanet(pid))
@@ -180,7 +266,7 @@ void DoTurn(PlanetWars& pw) {
 			source.Backup();
 			sim.Start(enemy.time, AP, AF, false, true);
 			int numShips = sim.GetPlanet(tid).NumShips();
-			numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+			numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
 
 			if (numShips <= 0)
 				continue;
@@ -211,7 +297,7 @@ void DoTurn(PlanetWars& pw) {
 	}
 
 	// ---------------------------------------------------------------------------
-	LOG("SNIPE"); // overtake neutral planets captured by the enemy RLLY CLOSE
+	LOG("SNIPE"); // overtake neutral planets captured by the enemy
 	// ---------------------------------------------------------------------------
 	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 	{
@@ -233,23 +319,18 @@ void DoTurn(PlanetWars& pw) {
 				if (source.NumShips() <= 0)
 					continue;
 
-				// we don't wanna be sniped
-				if (dist <= enemy.time)
-					continue;
-
-				// only snipe when we are the closest planet around
+				// only snipe when we are the closest planet around or if we are winning
 				std::vector<int> EPIRIDX = map.GetPlanetIDsInRadius(target.Loc(), EPIDX, dist);
 				if (end.GetScore() < 0 && !EPIRIDX.empty())
-					continue;
+					break;
 
-				// compute the timeframe in which we would benefit
-				const int timeFrame = target.NumShips() / target.GrowthRate();
-				if (dist-enemy.time >= timeFrame)
-					continue;
+				// we don't wanna be sniped, just wait
+				if (dist <= enemy.time)
+					break;
 
 				sim.Start(dist, AP, AF, false, true);
 				int numShips =
-					std::min<int>(source.NumShips()-GetRequiredShips(sid, AF,
+					std::min<int>(source.NumShips()-GetIncommingFleets(sid, AF,
 					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
 
 				if (numShips > 0)
@@ -286,7 +367,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("ATTACK"); // rage upon our enemy
 	// ---------------------------------------------------------------------------
-	if (/*end.GetScore() >= 0 &&*/ !EPIDX.empty())
+	if (!EPIDX.empty())
 	{
 		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
 		{
@@ -294,7 +375,7 @@ void DoTurn(PlanetWars& pw) {
 			const int sid = source.PlanetID();
 
 			end.Start(MAX_TURNS-turn, AP, AF, false, true);
-			int weakness = std::numeric_limits<int>::max();
+			int weakest = std::numeric_limits<int>::max();
 			int bestTarget = -1;
 			int bestDist = -1;
 			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
@@ -307,16 +388,16 @@ void DoTurn(PlanetWars& pw) {
 
 				const int dist = target.Distance(source);
 				int strength = GetStrength(tid, dist, EPIDX);
-				if (strength < weakness)
+				if (strength < weakest)
 				{
-					weakness = strength;
+					weakest = strength;
 					bestTarget = tid;
 					bestDist = dist;
 				}
 			}
 			if (bestTarget != -1)
 			{
-				int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
+				int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
 				sim.Start(bestDist, AP, AF, false, true);
 				if (numShips > 0 && numShips > sim.GetPlanet(bestTarget).NumShips())
 				{
@@ -349,7 +430,7 @@ void DoTurn(PlanetWars& pw) {
 			Planet& e = AP[eid];
 			const int dist = p.Distance(e);
 			int numShips = p.NumShips() - e.NumShips() -
-				GetRequiredShips(pid, AF, EFIDX) + dist*p.GrowthRate();
+				GetIncommingFleets(pid, AF, EFIDX) + dist*p.GrowthRate();
 
 			numShips = std::min<int>(numShips, p.NumShips());
 			if (numShips > 0 && p.NumShips() > 0)
@@ -385,8 +466,7 @@ void DoTurn(PlanetWars& pw) {
 					closer = mdist2target <= edist2target;
 				else
 					closer = mdist2target < edist2target;
-
-				const bool defend = source.NumShips() - GetRequiredShips(source.PlanetID(), AF, EFIDX) > 0;
+				const bool defend = source.NumShips() - GetIncommingFleets(source.PlanetID(), AF, EFIDX) > 0;
 				if (closer && defend)
 				{
 					candidates.push_back(target.PlanetID());
@@ -404,7 +484,7 @@ void DoTurn(PlanetWars& pw) {
 			w.push_back(candidate.NumShips() + 1);
 			//double value = candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D();
 			const int dist = (avgLoc - candidate.Loc()).len2D();
-			double value = std::numeric_limits<double>::max() / (candidate.NumShips() / (candidate.GrowthRate() + 1.0) + log(pow(2, dist)));
+			double value = GetValue(candidate, dist);
 			v.push_back(value);
 			PQ.push(NPV(candidate.PlanetID(), value));
 		}
@@ -429,7 +509,7 @@ void DoTurn(PlanetWars& pw) {
 						const int sid = source.PlanetID();
 						const int dist = target.Distance(source);
 						int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
-						numShips = std::min<int>(numShips, source.NumShips() - GetRequiredShips(sid, AF, EFIDX));
+						numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, AF, EFIDX));
 						if (numShips <= 0 || source.NumShips() <= 0)
 							continue;
 
@@ -481,7 +561,7 @@ void DoTurn(PlanetWars& pw) {
 						const int dist = target.Distance(source);
 						sim.Start(dist, AP, AF, false, true);
 						int numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShipsToSpare[sid]);
-						numShips = std::min<int>(numShips, source.NumShips() - GetRequiredShips(sid, AF, EFIDX));
+						numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, AF, EFIDX));
 						if (numShips <= 0)
 							continue;
 
@@ -543,11 +623,11 @@ void DoTurn(PlanetWars& pw) {
 				Planet& enemy = AP[eid];
 				const int edist = enemy.Distance(target);
 				numShips = GetStrength(eid, edist, EPIDX) - target.NumShips();
-				numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+				numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
 			}
 			else
 			{
-				numShips = std::min<int>(numShips, source.NumShips()-GetRequiredShips(sid, AF, EFIDX));
+				numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
 			}
 
 			if (numShips <= 0 || source.NumShips() <= 0)
@@ -555,7 +635,8 @@ void DoTurn(PlanetWars& pw) {
 
 			const int dist = source.Distance(target);
 			
-			Fleet order(1, numShips, sid, tid, dist, dist);
+			const int hid = GetHub(sid, tid);
+			Fleet order(1, numShips, sid, hid, dist, dist);
 			AF.push_back(order);
 			orders.push_back(order);
 			source.RemoveShips(numShips);
@@ -576,11 +657,12 @@ void DoTurn(PlanetWars& pw) {
 
 		Planet& target = AP[tid];
 		const int dist = target.Distance(source);
-		const int numShips = source.NumShips()-GetRequiredShips(sid, AF, EFIDX);
+		const int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
 		if (numShips <= 0)
 			continue;
 
-		Fleet order(1, numShips, sid, tid, dist, dist);
+		const int hid = GetHub(sid, tid);
+		Fleet order(1, numShips, sid, hid, dist, dist);
 		AF.push_back(order);
 		orders.push_back(order);
 		source.RemoveShips(numShips);
@@ -604,8 +686,23 @@ int main(int argc, char *argv[]) {
 	(void) argv;
 
 #ifdef DEBUG
+	time_t t;
+	time(&t);
+	struct tm* lt = localtime(&t);
+	char buf[1024] = {0};
+	snprintf(
+		buf,
+		1024 - 1,
+		"%s-%02d-%02d-%04d_%02d%02d.txt",
+		argv[0],
+		lt->tm_mon + 1,
+		lt->tm_mday,
+		lt->tm_year + 1900,
+		lt->tm_hour,
+		lt->tm_min
+	);
 	signal(SIGSEGV, SigHandler);
-	Logger logger(std::string(argv[0]) + ".txt");
+	Logger logger(buf);
 	Logger::SetLogger(&logger);
 	LOG(argv[0]<<" initialized");
 #endif
