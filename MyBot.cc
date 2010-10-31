@@ -579,7 +579,7 @@ void DoTurn(PlanetWars& pw) {
 			{
 				Planet& enemy = AP[eid];
 				const int edist = enemy.Distance(target);
-				numShips = GetStrength(eid, edist, EPIDX) - target.NumShips() + target.GrowthRate()*target.GrowthRate();
+				numShips = GetStrength(eid, edist, EPIDX) - target.NumShips() + pow(target.GrowthRate(), 2.0);
 				numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
 			}
 			else
