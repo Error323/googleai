@@ -560,48 +560,6 @@ void DoTurn(PlanetWars& pw) {
 	end.Start(MAX_TURNS-turn, _AP, _AF);
 	Map _map(_AP);
 	std::vector<int>& _FLPIDX = _map.GetFrontLine();
-	/*
-	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
-	{
-		Planet& source = AP[NTPIDX[i]];
-		const int sid = source.PlanetID();
-		if (find(_FLPIDX.begin(), _FLPIDX.end(), sid) != _FLPIDX.end())
-			continue;
-
-		bot::gTarget = sid;
-		sort(_FLPIDX.begin(), _FLPIDX.end(), bot::SortOnDistanceToTarget);
-		for (unsigned int j = 0, m = _FLPIDX.size(); j < m; j++)
-		{
-			Planet& target = AP[_FLPIDX[j]];
-			const int tid = target.PlanetID();
-			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
-			int numShips = 0;
-			if (eid != -1)
-			{
-				Planet& enemy = AP[eid];
-				const int edist = enemy.Distance(target);
-				numShips = GetStrength(eid, edist, EPIDX) - target.NumShips() + pow(target.GrowthRate(), 2.0);
-				numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
-			}
-			else
-			{
-				numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
-			}
-
-			if (numShips <= 0 || source.NumShips() <= 0)
-				continue;
-
-			const int dist = source.Distance(target);
-			
-			const int hid = GetHub(sid, tid);
-			Fleet order(1, numShips, sid, hid, dist, dist);
-			AF.push_back(order);
-			orders.push_back(order);
-			source.RemoveShips(numShips);
-		}
-	}
-	IssueOrders(orders);
-	*/
 
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 	{
