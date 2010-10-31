@@ -19,7 +19,7 @@
 #endif
 
 
-#define VERSION "14.0"
+#define VERSION "15.0"
 
 #define EPS 1.0e-10
 
@@ -60,35 +60,6 @@ int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& 
 	return numShipsRequired;
 }
 
-int GetStrength(const int tid, const int dist, std::vector<Planet>& ap, std::vector<Fleet>& af) {
-	std::vector<Planet> AP(ap);
-	std::vector<Fleet>  AF(af);
-	Planet& target = AP[tid];
-	const int tOwner = target.Owner();
-
-	Simulator sim;
-	for (int i = 0; i < dist; i++)
-	{
-		for (unsigned int i = 0, n = AP.size(); i < n; i++)
-		{
-			Planet& source = AP[i];
-			const int sid = source.PlanetID();
-			const int sOwner = source.Owner();
-			if (tOwner != sOwner || sid == tid)
-				continue;
-
-			const int distance = target.Distance(source);
-			if (distance <= dist)
-			{
-				Fleet order(tOwner, source.NumShips(), sid, tid, dist, dist);
-				AF.push_back(order);
-			}
-		}
-		sim.Start(1, AP, AF);
-	}
-	return target.NumShips();
-}
-
 int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 	int strength = 0;
 	ASSERT(tid >= 0 && tid < bot::gAP->size());
@@ -105,21 +76,6 @@ int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 		}
 	}
 	return strength;
-}
-
-int GetWeakness(const int tid, const int dist, std::vector<int>& EPIDX) {
-	int weakness = 0;
-	const Planet& target = bot::gAP->at(tid);
-	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
-	{
-		const Planet& candidate = bot::gAP->at(EPIDX[i]);
-		int distance = target.Distance(candidate);
-		if (distance > dist)
-		{
-			weakness++;
-		}
-	}
-	return weakness;
 }
 
 int GetHub(const int sid, const int tid) {
@@ -587,6 +543,8 @@ void DoTurn(PlanetWars& pw) {
 
 					AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
 					orders.clear();
+
+					// save up ships, cuz we are still losing
 					int sid = map.GetClosestPlanetIdx(target.Loc(), MHPIDX);
 					AP[sid].NumShips(0);
 				}
