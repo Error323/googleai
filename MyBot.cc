@@ -560,6 +560,7 @@ void DoTurn(PlanetWars& pw) {
 	end.Start(MAX_TURNS-turn, _AP, _AF);
 	Map _map(_AP);
 	std::vector<int>& _FLPIDX = _map.GetFrontLine();
+	/*
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 	{
 		Planet& source = AP[NTPIDX[i]];
@@ -600,6 +601,7 @@ void DoTurn(PlanetWars& pw) {
 		}
 	}
 	IssueOrders(orders);
+	*/
 
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 	{
