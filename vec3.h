@@ -127,6 +127,14 @@ template<typename T> struct vec3 {
 		return (V - R);
 	}
 
+	// project this vector onto the vector <N>
+	inline vec3<T> project(const vec3<T>& N) const {
+		vec3<T> P = N.norm2D();
+		double k = dot2D(P);
+		P *= k;
+		return P;
+	}
+
 	// refract this vector about the vector <N>
 	//   n1 is the refr. index of the material being exited
 	//   n2 is the refr. index of the material being entered
