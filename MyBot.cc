@@ -19,7 +19,7 @@
 #endif
 
 
-#define VERSION "15.0"
+#define VERSION "15.2"
 
 #define EPS 1.0e-10
 
