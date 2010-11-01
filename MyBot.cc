@@ -407,9 +407,6 @@ void DoTurn(PlanetWars& pw) {
 		for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
 		{
 			Planet& target = AP[NPIDX[i]];
-			if (target.NumShips() + 1 > totalNumShipsToSpare)
-				continue;
-
 			const int eid = map.GetClosestPlanetIdx(target.Loc(), EPIDX);
 			Planet& e = AP[eid];
 			const int edist2target = target.Distance(e);
