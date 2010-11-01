@@ -80,11 +80,13 @@ int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 
 int GetHub(const int sid, const int tid) {
 	#define BETWEEN(v, a, b) ((v > a && v < b) || (v < a && v > b))
+	#define MAX_DETOUR 1.0
 	int hid = tid;
 	const Planet& source = bot::gAP->at(sid);
 	const Planet& target = bot::gAP->at(tid);
 	vec3<double> vecTarget = target.Loc() - source.Loc();
 	double distance = vecTarget.len2D();
+	double s2t = distance;
 	for (unsigned int i = 0, n = bot::gAP->size(); i < n; i++)
 	{
 		const Planet& hub = bot::gAP->at(i);
@@ -94,11 +96,11 @@ int GetHub(const int sid, const int tid) {
 			vec3<double> vecProjectHub = vecHub.project(vecTarget);
 			if (BETWEEN(vecProjectHub.x, 0.0, vecTarget.x) && BETWEEN(vecProjectHub.z, 0.0, vecTarget.z))
 			{
-				// overstaande = acos(aanliggende / schuine)
-				const double hLength = vecHub.len2D();
+				const double s2h = vecHub.len2D();
+				const double h2t = (hub.Loc() - target.Loc()).len2D();
 				const double pLength = vecProjectHub.len2D();
-				const double deviation = sqrt(hLength*hLength - pLength*pLength);
-				if (pLength < distance && deviation < 1.5)
+				const double detour  = (s2h + h2t) - s2t;
+				if (pLength < distance && detour <= MAX_DETOUR)
 				{
 					hid = hub.PlanetID();
 					distance = pLength;
