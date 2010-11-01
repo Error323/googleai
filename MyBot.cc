@@ -47,27 +47,27 @@ double GetValue(Planet& p, int dist) {
 	return nom / denom;
 }
 
-int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& EFIDX) {
-	int numShipsRequired = 0;
-	for (unsigned int j = 0, m = EFIDX.size(); j < m; j++)
+int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& FIDX) {
+	int numFleets = 0;
+	for (unsigned int j = 0, m = FIDX.size(); j < m; j++)
 	{
-		Fleet& enemy = AF[EFIDX[j]];
-		if (enemy.DestinationPlanet() == sid)
+		Fleet& f = AF[FIDX[j]];
+		if (f.DestinationPlanet() == sid)
 		{
-			numShipsRequired += enemy.NumShips();
+			numFleets += f.NumShips();
 		}
 	}
-	return numShipsRequired;
+	return numFleets;
 }
 
-int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
+int GetStrength(const int tid, const int dist, std::vector<int>& PIDX) {
 	int strength = 0;
 	ASSERT(tid >= 0 && tid < bot::gAP->size());
 	const Planet& target = bot::gAP->at(tid);
-	for (unsigned int i = 0, n = EPIDX.size(); i < n; i++)
+	for (unsigned int i = 0, n = PIDX.size(); i < n; i++)
 	{
-		ASSERT(EPIDX[i] >= 0 && EPIDX[i] < bot::gAP->size());
-		const Planet& candidate = bot::gAP->at(EPIDX[i]);
+		ASSERT(PIDX[i] >= 0 && PIDX[i] < bot::gAP->size());
+		const Planet& candidate = bot::gAP->at(PIDX[i]);
 		int distance = target.Distance(candidate);
 		if (distance < dist)
 		{
@@ -80,7 +80,8 @@ int GetStrength(const int tid, const int dist, std::vector<int>& EPIDX) {
 
 int GetHub(const int sid, const int tid) {
 	#define BETWEEN(v, a, b) ((v > a && v < b) || (v < a && v > b))
-	#define MAX_DETOUR 1.0
+	static const double MAX_DETOUR = 1.0;
+
 	int hid = tid;
 	const Planet& source = bot::gAP->at(sid);
 	const Planet& target = bot::gAP->at(tid);
