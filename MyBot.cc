@@ -4,6 +4,7 @@
 #include "vec3.h"
 #include "Map.h"
 #include "KnapSack.h"
+#include "Timer.h"
 
 #include <iostream>
 #include <algorithm>
@@ -637,7 +638,15 @@ int main(int argc, char *argv[]) {
 				map_data = "";
 				LOG("turn: " << turn);
 				LOG(pw.ToString());
+				#ifdef DEBUG
+				Timer t;
+				t.Tick();
+				#endif
 				DoTurn(pw);
+				#ifdef DEBUG
+				t.Tock();
+				LOG("TIME: "<<t.Time()<<"s");
+				#endif
 				LOG("\n--------------------------------------------------------------------------------\n");
 				turn++;
 				pw.FinishTurn();
