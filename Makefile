@@ -1,6 +1,6 @@
 DEBUG=-g -rdynamic -DDEBUG
-CC=g++ -O2 -march=core2 #$(DEBUG)
-CFLAGS=-Wall -Wextra #$(DEBUG)
+CC=g++ -O2 -march=core2 $(DEBUG)
+CFLAGS=-Wall -Wextra $(DEBUG)
 
 OBJECTS=MyBot.o Timer.o Logger.o vec3.o PlanetWars.o Simulator.o Map.o KnapSack.o
 VERSION=`git describe --tags`

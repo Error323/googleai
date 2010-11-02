@@ -20,7 +20,7 @@
 #endif
 
 
-#define VERSION "15.2"
+#define VERSION "15.3"
 
 #define EPS 1.0e-10
 
@@ -43,10 +43,7 @@ struct NPV {
 };
 
 double GetValue(Planet& p, int dist) {
-	//double nom = std::numeric_limits<double>::max();
-	//double denom = (p.NumShips() / (p.GrowthRate() + EPS) + log(pow(2.0, dist)));
-	//return nom / denom;
-	return (pow(p.GrowthRate(), 2.0) / p.NumShips()) / dist;
+	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
 }
 
 int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& FIDX) {
