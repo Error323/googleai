@@ -13,7 +13,10 @@ $(TARGET): $(OBJECTS)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
 clean:
-	rm -rf $(TARGET)* *.o *.txt
+	rm -rf *.o *.txt
+
+realclean: clean
+	rm -rf $(TARGET)*
 
 zip:
 	zip $(TARGET)-$(VERSION).zip *.cc *.h *.inl
