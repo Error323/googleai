@@ -223,9 +223,9 @@ void DoTurn(PlanetWars& pw) {
 
 	Simulator end, sim;
 	end.Start(MAX_TURNS-turn, AP, AF, false, true);
-	int myNumShips    = 0;
-	int enemyNumShips = 0;
 
+	vec3<double> mAvgLoc(0.0, 0.0, 0.0);
+	vec3<double> eAvgLoc(0.0, 0.0, 0.0);
 	for (unsigned int i = 0, n = AP.size(); i < n; i++)
 	{
 		Planet& p = AP[i];
@@ -249,16 +249,18 @@ void DoTurn(PlanetWars& pw) {
 					TPIDX.push_back(pid);
 				else
 					NTPIDX.push_back(pid);
-				myNumShips += p.NumShips();
+				mAvgLoc += p.Loc();
 			} break;
 
 			default: 
 			{
 				EPIDX.push_back(pid);
-				enemyNumShips += p.NumShips();
+				eAvgLoc += p.Loc();
 			} break;
 		}
 	}
+	mAvgLoc /= (TPIDX.size() + NTPIDX.size());
+	eAvgLoc /= EPIDX.size();
 
 	for (unsigned int i = 0, n = AF.size(); i < n; i++)
 	{
@@ -266,12 +268,10 @@ void DoTurn(PlanetWars& pw) {
 		if (f.Owner() == 1)
 		{
 			MFIDX.push_back(i);
-			myNumShips += f.NumShips();
 		}
 		else
 		{
 			EFIDX.push_back(i);
-			enemyNumShips += f.NumShips();
 		}
 	}
 	Map map(AP);
@@ -301,7 +301,6 @@ void DoTurn(PlanetWars& pw) {
 			const int sid = source.PlanetID();
 			int weakest = std::numeric_limits<int>::max();
 			int bestTarget = -1;
-			int bestDist = -1;
 			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
 			{
 				Planet& target = AP[EPIDX[j]];
@@ -315,7 +314,6 @@ void DoTurn(PlanetWars& pw) {
 				{
 					weakest = strength;
 					bestTarget = tid;
-					bestDist = dist;
 				}
 			}
 			if (bestTarget != -1 && Attack(sid, bestTarget, AP, AF, EFIDX, orders, true))
@@ -326,12 +324,12 @@ void DoTurn(PlanetWars& pw) {
 		}
 	}
 
-	//sort(DAPIDX.begin(), DAPIDX.end(), bot::SortOnGrowthRateAndOwner);
+	sort(DAPIDX.begin(), DAPIDX.end(), bot::SortOnGrowthRateAndOwner);
 	for (unsigned int i = 0, n = DAPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[DAPIDX[i]];
 		const int tid = target.PlanetID();
-		if (target.Owner() == 1)
+		if (target.Owner() <= 1)
 		{
 			if (Defend(tid, AP, AF, NTPIDX, EFIDX, orders, false))
 			{
@@ -339,79 +337,10 @@ void DoTurn(PlanetWars& pw) {
 			}
 		}
 		else
-		if (target.Owner() > 1)
 		{
 			if (Attack(targets[tid], tid, AP, AF, EFIDX, orders, false))
 			{
 				IssueOrders(orders);
-			}
-		}
-	}
-
-	// ---------------------------------------------------------------------------
-	LOG("SNIPE"); // overtake neutral planets captured by the enemy
-	// ---------------------------------------------------------------------------
-	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
-	{
-		Planet& target = AP[NPIDX[i]];
-		const int tid = target.PlanetID();
-		if (end.IsEnemyPlanet(tid))
-		{
-			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
-			bot::gTarget = tid;
-			sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
-			bool success = false;
-			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
-			{
-				Planet& source = AP[NTPIDX[j]];
-				const int sid = source.PlanetID();
-				const int dist = target.Distance(source);
-
-				// not enough ships
-				if (source.NumShips() <= 0)
-					continue;
-
-				// only snipe when we are the closest planet around or if we are winning
-				std::vector<int> EPIRIDX = map.GetPlanetIDsInRadius(target.Loc(), EPIDX, dist);
-				if (end.GetScore() < 0 && !EPIRIDX.empty())
-					break;
-
-				// we don't wanna be sniped, just wait
-				if (dist <= enemy.time)
-					break;
-
-				sim.Start(dist, AP, AF, false, true);
-				int numShips =
-					std::min<int>(source.NumShips()-GetIncommingFleets(sid, AF,
-					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
-
-				if (numShips > 0)
-				{
-					Fleet order(1, numShips, sid, tid, dist, dist);
-					orders.push_back(order);
-					AF.push_back(order);
-					source.Backup();
-					source.RemoveShips(numShips);
-
-					sim.Start(dist, AP, AF, false, true);
-					if (sim.IsMyPlanet(tid))
-					{
-						success = true;
-						break;
-					}
-				}
-			}
-			if (success)
-			{
-				IssueOrders(orders);
-			}
-			else
-			{
-				for (unsigned int j = 0, m = orders.size(); j < m; j++)
-					AP[orders[j].SourcePlanet()].Restore();
-
-				AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
-				orders.clear();
 			}
 		}
 	}
@@ -593,6 +522,80 @@ void DoTurn(PlanetWars& pw) {
 					int sid = map.GetClosestPlanetIdx(target.Loc(), MHPIDX);
 					AP[sid].NumShips(0);
 				}
+			}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
+	LOG("SNIPE"); // overtake neutral planets captured by the enemy
+	// ---------------------------------------------------------------------------
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[NPIDX[i]];
+		const int tid = target.PlanetID();
+		if (end.IsEnemyPlanet(tid))
+		{
+			double tm = (target.Loc() - mAvgLoc).len2D();
+			double te = (target.Loc() - mAvgLoc).len2D();
+			// only snipe in our territory
+			if (te/2 < tm)
+				continue;
+
+			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+			bot::gTarget = tid;
+			sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
+			bool success = false;
+			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[NTPIDX[j]];
+				const int sid = source.PlanetID();
+				const int dist = target.Distance(source);
+
+				// not enough ships
+				if (source.NumShips() <= 0)
+					continue;
+
+				// only snipe when we are the closest planet around or if we are winning
+				std::vector<int> EPIRIDX = map.GetPlanetIDsInRadius(target.Loc(), EPIDX, dist);
+				if (end.GetScore() <= 0 && !EPIRIDX.empty())
+					break;
+
+				// we don't wanna be sniped, just wait
+				if (dist <= enemy.time)
+					break;
+
+				sim.Start(dist, AP, AF, false, true);
+				int numShips =
+					std::min<int>(source.NumShips()-GetIncommingFleets(sid, AF,
+					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
+
+				if (numShips > 0)
+				{
+					Fleet order(1, numShips, sid, tid, dist, dist);
+					orders.push_back(order);
+					AF.push_back(order);
+					source.Backup();
+					source.RemoveShips(numShips);
+
+					sim.Start(dist, AP, AF, false, true);
+					if (sim.IsMyPlanet(tid))
+					{
+						success = true;
+						break;
+					}
+				}
+			}
+			if (success)
+			{
+				IssueOrders(orders);
+			}
+			else
+			{
+				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+					AP[orders[j].SourcePlanet()].Restore();
+
+				AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+				orders.clear();
 			}
 		}
 	}
