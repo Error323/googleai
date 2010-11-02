@@ -354,7 +354,7 @@ void DoTurn(PlanetWars& pw) {
 			{
 				int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
 				sim.Start(bestDist, AP, AF, false, true);
-				if (numShips > 0 && numShips > sim.GetPlanet(bestTarget).NumShips())
+				if (numShips > sim.GetPlanet(bestTarget).NumShips())
 				{
 					Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
 					source.RemoveShips(numShips);
@@ -388,7 +388,7 @@ void DoTurn(PlanetWars& pw) {
 				GetIncommingFleets(pid, AF, EFIDX) + dist*p.GrowthRate();
 
 			numShips = std::min<int>(numShips, p.NumShips());
-			if (numShips > 0 && p.NumShips() > 0)
+			if (numShips > 0)
 			{
 				numShipsToSpare[pid] = numShips;
 				totalNumShipsToSpare += numShips;
