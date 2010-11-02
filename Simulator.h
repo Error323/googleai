@@ -34,13 +34,13 @@ public:
 	PlanetOwner& GetFirstEnemyOwner(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
-	bool IsMyPlanet(int i) 			{ ASSERT(i >= 0 && i < AP->size()); return AP->at(i).Owner() == 1; }
-	bool IsEnemyPlanet(int i) 		{ ASSERT(i >= 0 && i < AP->size()); return AP->at(i).Owner() > 1; }
+	bool IsMyPlanet(int i) 			{ return AP->at(i).Owner() == 1; }
+	bool IsEnemyPlanet(int i) 		{ return AP->at(i).Owner() > 1; }
 	bool IsSniped(int i);
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }
-	Planet& GetPlanet(int i)		{ ASSERT(i >= 0 && i < AP->size()); return AP->at(i); }
+	Planet& GetPlanet(int i)		{ return AP->at(i); }
 
 private:
 	int myNumShips;

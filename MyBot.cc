@@ -22,7 +22,6 @@
 
 #define VERSION "15.3"
 
-#define EPS 1.0e-10
 
 PlanetWars* gPW = NULL;
 int turn        = 0;
@@ -43,6 +42,7 @@ struct NPV {
 };
 
 double GetValue(Planet& p, int dist) {
+	#define EPS 1.0e-10
 	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
 }
 
@@ -61,11 +61,9 @@ int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& 
 
 int GetStrength(const int tid, const int dist, std::vector<int>& PIDX) {
 	int strength = 0;
-	ASSERT(tid >= 0 && tid < bot::gAP->size());
 	const Planet& target = bot::gAP->at(tid);
 	for (unsigned int i = 0, n = PIDX.size(); i < n; i++)
 	{
-		ASSERT(PIDX[i] >= 0 && PIDX[i] < bot::gAP->size());
 		const Planet& candidate = bot::gAP->at(PIDX[i]);
 		int distance = target.Distance(candidate);
 		if (distance < dist)
@@ -120,7 +118,6 @@ void IssueOrders(std::vector<Fleet>& orders) {
 		const int tid = order.DestinationPlanet();
 
 		ASSERT_MSG(numships > 0, order);
-		ASSERT(sid >= 0 && sid < bot::gAP->size());
 		ASSERT_MSG(bot::gAP->at(sid).Owner() == 1, order);
 		ASSERT_MSG(tid >= 0 && tid != sid, order);
 		gPW->IssueOrder(sid, tid, numships);
@@ -370,7 +367,7 @@ void DoTurn(PlanetWars& pw) {
 	}
 
 	// ---------------------------------------------------------------------------
-	LOG("EXPAND"); // when we are losing or drawing
+	LOG("EXPAND"); // capture neutrals when we are losing or drawing
 	// ---------------------------------------------------------------------------
 	end.Start(MAX_TURNS-turn, AP, AF, false, true);
 	if (end.GetScore() <= 0)
@@ -437,7 +434,6 @@ void DoTurn(PlanetWars& pw) {
 		{
 			Planet& candidate = AP[candidates[i]];
 			w.push_back(candidate.NumShips() + 1);
-			//double value = candidate.GrowthRate() / (avgLoc - candidate.Loc()).len2D();
 			const int dist = (avgLoc - candidate.Loc()).len2D();
 			double value = GetValue(candidate, dist);
 			v.push_back(value);
@@ -543,7 +539,7 @@ void DoTurn(PlanetWars& pw) {
 					AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
 					orders.clear();
 
-					// save up ships, cuz we are still losing
+					// "Lock" the closest planet to the best neutral
 					int sid = map.GetClosestPlanetIdx(target.Loc(), MHPIDX);
 					AP[sid].NumShips(0);
 				}
@@ -552,22 +548,22 @@ void DoTurn(PlanetWars& pw) {
 	}
 
 	// ---------------------------------------------------------------------------
-	LOG("FEED"); // support the frontline
+	LOG("FEED"); // support the frontline through routing
 	// ---------------------------------------------------------------------------
-	std::vector<Planet> _AP(AP);
-	std::vector<Fleet>  _AF(AF);
-	end.Start(MAX_TURNS-turn, _AP, _AF);
-	Map _map(_AP);
-	std::vector<int>& _FLPIDX = _map.GetFrontLine();
+	std::vector<Planet> AFP(AP); // all future planets
+	std::vector<Fleet>  AFF(AF); // all future fleets
+	end.Start(MAX_TURNS-turn, AFP, AFF);
+	Map fmap(AFP); // future map, to compute future frontline
+	std::vector<int>& FFLPIDX = fmap.GetFrontLine();
 
 	for (unsigned int i = 0, n = NTPIDX.size(); i < n; i++)
 	{
 		Planet& source = AP[NTPIDX[i]];
 		const int sid = source.PlanetID();
-		if (find(_FLPIDX.begin(), _FLPIDX.end(), sid) != _FLPIDX.end())
+		if (find(FFLPIDX.begin(), FFLPIDX.end(), sid) != FFLPIDX.end())
 			continue;
 
-		const int tid = map.GetClosestPlanetIdx(source.Loc(), _FLPIDX);
+		const int tid = map.GetClosestPlanetIdx(source.Loc(), FFLPIDX);
 		if (tid == -1)
 			continue;
 
@@ -601,7 +597,7 @@ int main(int argc, char *argv[]) {
 	(void) argc;
 	(void) argv;
 
-#ifdef DEBUG
+	#ifdef DEBUG
 	time_t t;
 	time(&t);
 	struct tm* lt = localtime(&t);
@@ -621,7 +617,7 @@ int main(int argc, char *argv[]) {
 	Logger logger(buf);
 	Logger::SetLogger(&logger);
 	LOG(argv[0]<<" initialized");
-#endif
+	#endif
 
 	std::string current_line;
 	std::string map_data;
