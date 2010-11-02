@@ -10,8 +10,6 @@
 
 #include "Timer.h"
 
-
-
 struct TimerState {
 	#if (USE_POSIX_TIMERS)
 		struct timespec t0;
@@ -52,7 +50,6 @@ struct TimerState {
 		}
 	#endif
 };
-
 
 
 Timer::Timer() { state = new TimerState(); }

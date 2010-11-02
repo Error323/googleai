@@ -1,5 +1,5 @@
-#ifndef _TIMER_HDR_
-#define _TIMER_HDR_
+#ifndef TIMER_
+#define TIMER_
 
 struct TimerState;
 class Timer {
