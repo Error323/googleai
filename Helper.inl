@@ -1,10 +1,14 @@
 const std::vector<Planet>* gAP     = NULL;
 int                        gTarget = 0;
 
-inline bool SortOnGrowthRate(const int pidA, const int pidB) {
+inline bool SortOnGrowthRateAndOwner(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
 	const Planet& b = gAP->at(pidB);
-	return a.GrowthRate() > b.GrowthRate();
+
+	if (a.GrowthRate() == b.GrowthRate())
+		return a.Owner() < b.Owner();
+	else
+		return a.GrowthRate() > b.GrowthRate();
 }
 
 inline bool SortOnDistanceToTarget(const int pidA, const int pidB) {

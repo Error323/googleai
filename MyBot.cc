@@ -75,6 +75,90 @@ int GetStrength(const int tid, const int dist, std::vector<int>& PIDX) {
 	return strength;
 }
 
+bool Defend(int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
+				std::vector<int>& NTPIDX, std::vector<int>& EFIDX,
+				std::vector<Fleet>& orders, bool restore) {
+
+	Simulator end, sim;
+	end.Start(MAX_TURNS-turn, AP, AF, false, true);
+	Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+	Planet& target = AP[tid];
+	bot::gTarget = tid;
+	sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
+	bool success = false;
+	for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+	{
+		Planet& source = AP[NTPIDX[j]];
+		const int sid = source.PlanetID();
+		if (source.NumShips() <= 0)
+			continue;
+
+		const int dist = target.Distance(source);
+		if (dist > enemy.time)
+			continue;
+
+		source.Backup();
+		sim.Start(enemy.time, AP, AF, false, true);
+		int numShips = sim.GetPlanet(tid).NumShips();
+		numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
+
+		if (numShips <= 0)
+			continue;
+
+		source.RemoveShips(numShips);
+		Fleet order(1, numShips, sid, tid, dist, dist);
+		AF.push_back(order);
+		orders.push_back(order);
+		sim.Start(enemy.time, AP, AF, false, true);
+		if (sim.IsMyPlanet(tid))
+		{
+			success = true;
+			break;
+		}
+	}
+	if (!success || restore)
+	{
+		for (unsigned int j = 0, m = orders.size(); j < m; j++)
+			AP[orders[j].SourcePlanet()].Restore();
+
+		AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+		orders.clear();
+	}
+	return success;
+}
+
+bool Attack(int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
+				std::vector<int>& EFIDX, std::vector<Fleet>& orders, bool restore) {
+
+	Simulator sim;
+	bool canAttack = false;
+	Planet& source = AP[sid];
+	Planet& target = AP[tid];
+	const int dist = source.Distance(target);
+	sim.Start(dist, AP, AF, false, true);
+	int numShipsRequired = sim.GetPlanet(tid).NumShips();
+	int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
+	canAttack = numShips > numShipsRequired;
+
+	if (canAttack)
+	{
+		Fleet order(1, numShips, sid, tid, dist, dist);
+		source.Backup();
+		source.RemoveShips(numShips);
+		orders.push_back(order);
+		AF.push_back(order);
+	}
+
+	if (canAttack && restore)
+	{
+		source.Restore();
+		AF.pop_back();
+		orders.pop_back();
+	}
+
+	return canAttack;
+}
+
 int GetHub(const int sid, const int tid) {
 	#define BETWEEN(v, a, b) ((v > a && v < b) || (v < a && v > b))
 	static const double MAX_DETOUR = 1.0;
@@ -195,59 +279,72 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<Fleet> orders;
 
 	// ---------------------------------------------------------------------------
-	LOG("DEFEND"); // defend our planets when possible
+	LOG("DEFEND AND ATTACK"); // sort planets on growthrate and perform attack
 	// ---------------------------------------------------------------------------
-	sort(TPIDX.begin(), TPIDX.end(), bot::SortOnDistanceToEnemy);
+	std::vector<int> DAPIDX;
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[TPIDX[i]];
 		const int tid = target.PlanetID();
-
-		Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
-		bot::gTarget = tid;
-		sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
-		bool success = false;
-		for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+		if (Defend(tid, AP, AF, NTPIDX, EFIDX, orders, true))
 		{
-			Planet& source = AP[NTPIDX[j]];
+			DAPIDX.push_back(tid);
+		}
+	}
+
+	std::map<int,int> targets;
+	if (!EPIDX.empty())
+	{
+		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
+		{
+			Planet& source = AP[FLPIDX[i]];
 			const int sid = source.PlanetID();
-			if (source.NumShips() <= 0)
-				continue;
-
-			const int dist = target.Distance(source);
-			if (dist > enemy.time)
-				continue;
-
-			source.Backup();
-			sim.Start(enemy.time, AP, AF, false, true);
-			int numShips = sim.GetPlanet(tid).NumShips();
-			numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
-
-			if (numShips <= 0)
-				continue;
-
-			source.RemoveShips(numShips);
-			Fleet order(1, numShips, sid, tid, dist, dist);
-			AF.push_back(order);
-			orders.push_back(order);
-			sim.Start(enemy.time, AP, AF, false, true);
-			if (sim.IsMyPlanet(tid))
+			int weakest = std::numeric_limits<int>::max();
+			int bestTarget = -1;
+			int bestDist = -1;
+			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
 			{
-				success = true;
-				break;
+				Planet& target = AP[EPIDX[j]];
+				const int tid = target.PlanetID();
+				if (find(DAPIDX.begin(), DAPIDX.end(), tid) != DAPIDX.end())
+					continue;
+
+				const int dist = target.Distance(source);
+				int strength = GetStrength(tid, dist, EPIDX);
+				if (strength < weakest)
+				{
+					weakest = strength;
+					bestTarget = tid;
+					bestDist = dist;
+				}
+			}
+			if (bestTarget != -1 && Attack(sid, bestTarget, AP, AF, EFIDX, orders, true))
+			{
+				targets[bestTarget] = sid;
+				DAPIDX.push_back(bestTarget);
 			}
 		}
-		if (success)
+	}
+
+	//sort(DAPIDX.begin(), DAPIDX.end(), bot::SortOnGrowthRateAndOwner);
+	for (unsigned int i = 0, n = DAPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[DAPIDX[i]];
+		const int tid = target.PlanetID();
+		if (target.Owner() == 1)
 		{
-			IssueOrders(orders);
+			if (Defend(tid, AP, AF, NTPIDX, EFIDX, orders, false))
+			{
+				IssueOrders(orders);
+			}
 		}
 		else
+		if (target.Owner() > 1)
 		{
-			for (unsigned int j = 0, m = orders.size(); j < m; j++)
-				AP[orders[j].SourcePlanet()].Restore();
-
-			AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
-			orders.clear();
+			if (Attack(targets[tid], tid, AP, AF, EFIDX, orders, false))
+			{
+				IssueOrders(orders);
+			}
 		}
 	}
 
@@ -317,53 +414,6 @@ void DoTurn(PlanetWars& pw) {
 				orders.clear();
 			}
 		}
-	}
-
-	// ---------------------------------------------------------------------------
-	LOG("ATTACK"); // rage upon our enemy
-	// ---------------------------------------------------------------------------
-	if (!EPIDX.empty())
-	{
-		for (unsigned int i = 0, n = FLPIDX.size(); i < n; i++)
-		{
-			Planet& source = AP[FLPIDX[i]];
-			const int sid = source.PlanetID();
-
-			end.Start(MAX_TURNS-turn, AP, AF, false, true);
-			int weakest = std::numeric_limits<int>::max();
-			int bestTarget = -1;
-			int bestDist = -1;
-			for (unsigned int j = 0, m = EPIDX.size(); j < m; j++)
-			{
-				Planet& target = AP[EPIDX[j]];
-				const int tid = target.PlanetID();
-
-				if (end.IsMyPlanet(tid))
-					continue;
-
-				const int dist = target.Distance(source);
-				int strength = GetStrength(tid, dist, EPIDX);
-				if (strength < weakest)
-				{
-					weakest = strength;
-					bestTarget = tid;
-					bestDist = dist;
-				}
-			}
-			if (bestTarget != -1)
-			{
-				int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
-				sim.Start(bestDist, AP, AF, false, true);
-				if (numShips > sim.GetPlanet(bestTarget).NumShips())
-				{
-					Fleet order(1, numShips, sid, bestTarget, bestDist, bestDist);
-					source.RemoveShips(numShips);
-					orders.push_back(order);
-					AF.push_back(order);
-				}
-			}
-		}
-		IssueOrders(orders);
 	}
 
 	// ---------------------------------------------------------------------------
