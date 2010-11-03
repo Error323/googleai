@@ -43,7 +43,17 @@ struct NPV {
 
 double GetValue(Planet& p, int dist) {
 	#define EPS 1.0e-10
-	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
+	int smallestDist = std::numeric_limits<int>::max();
+	for (unsigned int i = 0, n = bot::gAP->size(); i < n; i++)
+	{
+		const Planet& n = bot::gAP->at(i);
+		if (n.Owner() == 0)
+		{
+			int dist = p.Distance(n);
+			smallestDist = std::min<int>(smallestDist, dist);
+		}
+	}
+	return  (pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS)) - (0.1 * pow(smallestDist, 2.0));
 }
 
 int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& FIDX) {
@@ -328,6 +338,7 @@ void DoTurn(PlanetWars& pw) {
 	for (unsigned int i = 0, n = DAPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[DAPIDX[i]];
+		LOG(target.GrowthRate());
 		const int tid = target.PlanetID();
 		if (target.Owner() <= 1)
 		{
@@ -535,12 +546,6 @@ void DoTurn(PlanetWars& pw) {
 		const int tid = target.PlanetID();
 		if (end.IsEnemyPlanet(tid))
 		{
-			double tm = (target.Loc() - mAvgLoc).len2D();
-			double te = (target.Loc() - mAvgLoc).len2D();
-			// only snipe in our territory
-			if (te/2 < tm)
-				continue;
-
 			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
 			bot::gTarget = tid;
 			sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
@@ -555,14 +560,13 @@ void DoTurn(PlanetWars& pw) {
 				if (source.NumShips() <= 0)
 					continue;
 
-				// only snipe when we are the closest planet around or if we are winning
-				std::vector<int> EPIRIDX = map.GetPlanetIDsInRadius(target.Loc(), EPIDX, dist);
-				if (end.GetScore() <= 0 && !EPIRIDX.empty())
-					break;
-
 				// we don't wanna be sniped, just wait
 				if (dist <= enemy.time)
 					break;
+
+				// only snipe when we are locally stronger
+				if (GetStrength(tid, dist, NTPIDX) < GetStrength(tid, dist, EPIDX))
+					continue;
 
 				sim.Start(dist, AP, AF, false, true);
 				int numShips =
