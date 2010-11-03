@@ -43,17 +43,7 @@ struct NPV {
 
 double GetValue(Planet& p, int dist) {
 	#define EPS 1.0e-10
-	int smallestDist = std::numeric_limits<int>::max();
-	for (unsigned int i = 0, n = bot::gAP->size(); i < n; i++)
-	{
-		const Planet& n = bot::gAP->at(i);
-		if (n.Owner() == 0)
-		{
-			int dist = p.Distance(n);
-			smallestDist = std::min<int>(smallestDist, dist);
-		}
-	}
-	return (pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS)) - (EPS * pow(smallestDist, 2.0));
+	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
 }
 
 int GetIncommingFleets(const int sid, std::vector<int>& FIDX, int remaining = std::numeric_limits<int>::max()) {
