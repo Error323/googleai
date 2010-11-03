@@ -1,4 +1,5 @@
 const std::vector<Planet>* gAP     = NULL;
+const std::vector<Fleet>*  gAF     = NULL;
 int                        gTarget = 0;
 
 inline bool SortOnGrowthRateAndOwner(const int pidA, const int pidB) {
@@ -18,28 +19,6 @@ inline bool SortOnDistanceToTarget(const int pidA, const int pidB) {
 	const int distA = a.Distance(t);
 	const int distB = b.Distance(t);
 	return distA < distB;
-}
-
-inline bool SortOnDistanceToEnemy(const int pidA, const int pidB) {
-	const Planet& a = gAP->at(pidA);
-	const Planet& b = gAP->at(pidB);
-	int dista = 1000000;
-	int distb = 1000000;
-	for (unsigned int i = 0, n = gAP->size(); i < n; i++)
-	{
-		const Planet& p = gAP->at(i);
-		if (p.Owner() > 1)
-		{
-			int da = p.Distance(a);
-			int db = p.Distance(b);
-			dista = std::min<int>(dista, da);
-			distb = std::min<int>(distb, db);
-		}
-	}
-	if (dista == distb)
-		return a.GrowthRate() > b.GrowthRate();
-	else
-		return dista < distb;
 }
 
 inline bool SortOnGrowthShipRatio(const int pidA, const int pidB) {

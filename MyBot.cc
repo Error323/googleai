@@ -20,7 +20,7 @@
 #endif
 
 
-#define VERSION "15.3"
+#define VERSION "17.0"
 
 
 PlanetWars* gPW = NULL;
@@ -53,15 +53,15 @@ double GetValue(Planet& p, int dist) {
 			smallestDist = std::min<int>(smallestDist, dist);
 		}
 	}
-	return  (pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS)) - (0.1 * pow(smallestDist, 2.0));
+	return (pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS)) - (EPS * pow(smallestDist, 2.0));
 }
 
-int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& FIDX) {
+int GetIncommingFleets(const int sid, std::vector<int>& FIDX, int remaining = std::numeric_limits<int>::max()) {
 	int numFleets = 0;
 	for (unsigned int j = 0, m = FIDX.size(); j < m; j++)
 	{
-		Fleet& f = AF[FIDX[j]];
-		if (f.DestinationPlanet() == sid)
+		const Fleet& f = bot::gAF->at(FIDX[j]);
+		if (f.DestinationPlanet() == sid && f.TurnsRemaining() <= remaining)
 		{
 			numFleets += f.NumShips();
 		}
@@ -69,17 +69,18 @@ int GetIncommingFleets(const int sid, std::vector<Fleet>& AF, std::vector<int>& 
 	return numFleets;
 }
 
-int GetStrength(const int tid, const int dist, std::vector<int>& PIDX) {
+int GetStrength(const int tid, const int dist, std::vector<int>& PIDX, std::vector<int>& FIDX) {
 	int strength = 0;
 	const Planet& target = bot::gAP->at(tid);
 	for (unsigned int i = 0, n = PIDX.size(); i < n; i++)
 	{
-		const Planet& candidate = bot::gAP->at(PIDX[i]);
-		int distance = target.Distance(candidate);
-		if (distance < dist)
+		const Planet& p = bot::gAP->at(PIDX[i]);
+		const int pid = p.PlanetID();
+		int distance = target.Distance(p);
+		if (distance < dist && pid != tid)
 		{
 			int time = dist - distance;
-			strength += candidate.NumShips() + time*candidate.GrowthRate();
+			strength += p.NumShips() + time*p.GrowthRate() + GetIncommingFleets(pid, FIDX, time);
 		}
 	}
 	return strength;
@@ -110,7 +111,7 @@ bool Defend(int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 		source.Backup();
 		sim.Start(enemy.time, AP, AF, false, true);
 		int numShips = sim.GetPlanet(tid).NumShips();
-		numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, AF, EFIDX));
+		numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, EFIDX));
 
 		if (numShips <= 0)
 			continue;
@@ -147,7 +148,7 @@ bool Attack(int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 	const int dist = source.Distance(target);
 	sim.Start(dist, AP, AF, false, true);
 	int numShipsRequired = sim.GetPlanet(tid).NumShips();
-	int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
+	int numShips = source.NumShips()-GetIncommingFleets(sid, EFIDX);
 	canAttack = numShips > numShipsRequired;
 
 	if (canAttack)
@@ -224,6 +225,7 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<Fleet>  AF = pw.Fleets();
 	gPW                    = &pw;
 	bot::gAP               = &AP;
+	bot::gAF               = &AF;
 	std::vector<int> NPIDX;  // neutral planets
 	std::vector<int> EPIDX;  // enemy planets
 	std::vector<int> TPIDX;  // targetted planets belonging to us
@@ -319,7 +321,7 @@ void DoTurn(PlanetWars& pw) {
 					continue;
 
 				const int dist = target.Distance(source);
-				int strength = GetStrength(tid, dist, EPIDX);
+				int strength = GetStrength(tid, dist, EPIDX, EFIDX) + target.NumShips();
 				if (strength < weakest)
 				{
 					weakest = strength;
@@ -375,7 +377,7 @@ void DoTurn(PlanetWars& pw) {
 			Planet& e = AP[eid];
 			const int dist = p.Distance(e);
 			int numShips = p.NumShips() - e.NumShips() -
-				GetIncommingFleets(pid, AF, EFIDX) + dist*p.GrowthRate();
+				GetIncommingFleets(pid, EFIDX) + dist*p.GrowthRate();
 
 			numShips = std::min<int>(numShips, p.NumShips());
 			if (numShips > 0)
@@ -408,7 +410,7 @@ void DoTurn(PlanetWars& pw) {
 					closer = mdist2target <= edist2target;
 				else
 					closer = mdist2target < edist2target;
-				const bool defend = source.NumShips() - GetIncommingFleets(source.PlanetID(), AF, EFIDX) > 0;
+				const bool defend = source.NumShips() - GetIncommingFleets(source.PlanetID(), EFIDX) > 0;
 				if (closer && defend)
 				{
 					candidates.push_back(target.PlanetID());
@@ -450,7 +452,7 @@ void DoTurn(PlanetWars& pw) {
 						const int sid = source.PlanetID();
 						const int dist = target.Distance(source);
 						int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
-						numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, AF, EFIDX));
+						numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, EFIDX));
 						if (numShips <= 0 || source.NumShips() <= 0)
 							continue;
 
@@ -500,7 +502,7 @@ void DoTurn(PlanetWars& pw) {
 					const int dist = target.Distance(source);
 					sim.Start(dist, AP, AF, false, true);
 					int numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShipsToSpare[sid]);
-					numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, AF, EFIDX));
+					numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, EFIDX));
 					if (numShips <= 0)
 						continue;
 
@@ -565,12 +567,12 @@ void DoTurn(PlanetWars& pw) {
 					break;
 
 				// only snipe when we are locally stronger
-				if (GetStrength(tid, dist, NTPIDX) < GetStrength(tid, dist, EPIDX))
+				if (GetStrength(tid, dist, NTPIDX, MFIDX) < GetStrength(tid, dist, EPIDX, EFIDX))
 					continue;
 
 				sim.Start(dist, AP, AF, false, true);
 				int numShips =
-					std::min<int>(source.NumShips()-GetIncommingFleets(sid, AF,
+					std::min<int>(source.NumShips()-GetIncommingFleets(sid,
 					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
 
 				if (numShips > 0)
@@ -626,7 +628,7 @@ void DoTurn(PlanetWars& pw) {
 
 		Planet& target = AP[tid];
 		const int dist = target.Distance(source);
-		const int numShips = source.NumShips()-GetIncommingFleets(sid, AF, EFIDX);
+		const int numShips = source.NumShips()-GetIncommingFleets(sid, EFIDX);
 		if (numShips <= 0)
 			continue;
 
