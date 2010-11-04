@@ -144,6 +144,7 @@ void Planet::AddShips(int amount) {
 
 void Planet::RemoveShips(int amount) {
   num_ships_ -= amount;
+  ASSERT(num_ships_ >= 0);
 }
 
 void Planet::Backup() {

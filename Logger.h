@@ -84,13 +84,30 @@ class Logger {
 		Logger::Instance()->Log(ss.str());    \
 	} while(0)
 
+#define LOGD(msg)                             \
+	do {                                      \
+		std::stringstream ss;                 \
+		for (int i = 0; i < depth; i++)       \
+			ss << "\t";                       \
+		ss << msg;                            \
+		Logger::Instance()->Log(ss.str());    \
+	} while (0)
+
 #define FORMAT_STRING "***ASSERTION FAILED***\n\n\tfile\t%s\n\tline\t%d\n\tfunc\t%s\n\tcond\t%s\n"
+#define FORMAT_STRINGD FORMAT_STRING "\tdept\t%d"
 
 #define ASSERT(cond)                                                              \
 	do {                                                                          \
 		if ( !(cond) ) {                                                          \
 			FATAL(FORMAT_STRING, __FILE__, __LINE__, __PRETTY_FUNCTION__, #cond); \
 		}                                                                         \
+	} while (0)
+
+#define ASSERTD(cond)                                                                     \
+	do {                                                                                  \
+		if ( !(cond) ) {                                                                  \
+			FATAL(FORMAT_STRINGD, __FILE__, __LINE__, __PRETTY_FUNCTION__, #cond, depth); \
+		}                                                                                 \
 	} while (0)
 
 #define ASSERT_MSG(cond, msg)                                                     \

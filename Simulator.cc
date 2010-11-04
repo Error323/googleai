@@ -100,6 +100,7 @@ void Simulator::Start(int totalTurns,
 		
 		// Add ship growth for non-neutral planets
 		Planet& p = AP->at(f.DestinationPlanet());
+		ASSERT(p.NumShips() >= 0);
 		if (p.Owner() > 0)
 		{
 			p.AddShips(turnsRemaining*p.GrowthRate());
