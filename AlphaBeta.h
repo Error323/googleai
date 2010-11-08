@@ -9,6 +9,7 @@
 #include <limits>
 #include <ctime>
 #include <queue>
+#include <utility>
 
 #define MAX_TURNS 200
 
@@ -52,7 +53,6 @@ public:
 private:
 	std::vector<Action> GetActions(Node&, int);
 	std::vector<Node> nodeStack;
-	std::vector<Action> actionStack;
 	Action bestAction;
 
 	PlanetWars& pw;
@@ -64,8 +64,8 @@ private:
 	int maxDepth;
 	double maxTime;
 
-	int Search(Node&, int, int, int);
-	void Simulate(Node&, int);
+	int Search(Node&, std::pair<Action,Action>, int, int, int);
+	void Simulate(Node&, std::pair<Action, Action>&, int);
 	bool IsTerminal(int);
 	int GetScore(Node&, int);
 

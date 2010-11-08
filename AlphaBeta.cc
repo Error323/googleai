@@ -25,11 +25,12 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	maxDepth = plies*2;
 	maxDepth = std::min<int>(maxDepth, (MAX_TURNS-turn)*2);
 	nodeStack.resize(plies);
-	actionStack.resize(maxDepth);
 
 	Node origin(AP, AF);
+	Action a;
+	std::pair<Action,Action> actionPair(a, a);
 	sim.Start(0, AP, AF);
-	int alpha = Search(origin, 0, std::numeric_limits<int>::min(),
+	int alpha = Search(origin, actionPair, 0, std::numeric_limits<int>::min(),
 		std::numeric_limits<int>::max());
 
 	ASSERT_MSG(bestScore == alpha, "bestscore: "<<bestScore<<"\talpha: "<<alpha);
@@ -37,7 +38,7 @@ std::vector<Fleet>& AlphaBeta::GetOrders(int t, int plies) {
 	return bestAction.orders;
 }
 
-int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
+int AlphaBeta::Search(Node& node, std::pair<Action, Action> actionPair, int depth, int alpha, int beta) {
 	nodesVisited++;
 	if (IsTerminal(depth))
 	{
@@ -47,26 +48,28 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 	if (depth % 2 == 1)
 	{
 		nodeStack[depth/2] = node;
-		Simulate(node, depth);
+		Simulate(node, actionPair, depth);
 	}
 
 	std::vector<Action> actions = GetActions(node, depth);
 	for (int i = 0, n = actions.size(); i < n; i++)
 	{
-		actionStack[depth] = actions[i];
-		alpha = std::max<int>(alpha, -Search(node, depth + 1, -beta, -alpha));
+		if (depth % 2 == 0)
+			actionPair.first = actions[i];
+		else
+			actionPair.second = actions[i];
 
-		if (beta <= alpha)
-		{
-			//FIXME: Alpha beta cutoff not working yet, can't figure out the
-			// cause yet, but the symptom is a messed up action stack
-			//break;
-		}
+		alpha = std::max<int>(alpha, -Search(node, actionPair, depth + 1, -beta, -alpha));
 
 		if (depth == 0 && alpha > bestScore)
 		{
 			bestAction = actions[i];
 			bestScore = alpha;
+		}
+
+		if (beta <= alpha)
+		{
+			break;
 		}
 	}
 
@@ -78,18 +81,18 @@ int AlphaBeta::Search(Node& node, int depth, int alpha, int beta) {
 	return alpha;
 }
 
-void AlphaBeta::Simulate(Node& node, int depth) {
-	for (int i = 0, n = actionStack[depth-1].orders.size(); i < n; i++)
+void AlphaBeta::Simulate(Node& node, std::pair<Action, Action>& actionPair, int depth) {
+	for (int i = 0, n = actionPair.first.orders.size(); i < n; i++)
 	{
-		Fleet& order = actionStack[depth-1].orders[i];
+		Fleet& order = actionPair.first.orders[i];
 		Planet& source = node.AP[order.SourcePlanet()];
 		ASSERTD(order.Owner() == source.Owner());
 		source.RemoveShips(order.NumShips());
 		node.AF.push_back(order);
 	}
-	for (int i = 0, n = actionStack[depth].orders.size(); i < n; i++)
+	for (int i = 0, n = actionPair.second.orders.size(); i < n; i++)
 	{
-		Fleet& order = actionStack[depth].orders[i];
+		Fleet& order = actionPair.second.orders[i];
 		Planet& source = node.AP[order.SourcePlanet()];
 		ASSERTD(order.Owner() == source.Owner());
 		source.RemoveShips(order.NumShips());
