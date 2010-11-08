@@ -52,8 +52,9 @@ int AlphaBeta::Search(Node& node, std::pair<Action, Action> actionPair, int dept
 	}
 
 	std::vector<Action> actions = GetActions(node, depth);
-	for (int i = 0, n = actions.size(); i < n; i++)
+	for (int i = actions.size()-1; i >= 0; i--)
 	{
+		LOGD(actions[i].value);
 		if (depth % 2 == 0)
 			actionPair.first = actions[i];
 		else
@@ -85,6 +86,7 @@ void AlphaBeta::Simulate(Node& node, std::pair<Action, Action>& actionPair, int 
 	for (int i = 0, n = actionPair.first.orders.size(); i < n; i++)
 	{
 		Fleet& order = actionPair.first.orders[i];
+		order.Owner(1);
 		Planet& source = node.AP[order.SourcePlanet()];
 		ASSERTD(order.Owner() == source.Owner());
 		source.RemoveShips(order.NumShips());
@@ -93,6 +95,7 @@ void AlphaBeta::Simulate(Node& node, std::pair<Action, Action>& actionPair, int 
 	for (int i = 0, n = actionPair.second.orders.size(); i < n; i++)
 	{
 		Fleet& order = actionPair.second.orders[i];
+		order.Owner(2);
 		Planet& source = node.AP[order.SourcePlanet()];
 		ASSERTD(order.Owner() == source.Owner());
 		source.RemoveShips(order.NumShips());
@@ -127,6 +130,40 @@ bool AlphaBeta::IsTerminal(int depth) {
 	return sim.MyNumShips() <= 0 || sim.EnemyNumShips() <= 0;
 }
 
+void AlphaBeta::Node::GenerateActions(int depth, std::vector<int>& FLPIDX,
+	std::vector<int>& PIDX, std::vector<AlphaBeta::Action>& actions) {
+	
+	int F = FLPIDX.size();
+	if (depth == F)
+	{
+		std::vector<Fleet> orders;
+		for (int i = 0; i < F; i++)
+		{
+			Planet& source = AP[FLPIDX[i]];
+			Planet& target = AP[planetStack[i]];
+			const int sid  = source.PlanetID();
+			const int tid  = target.PlanetID();
+			const int dist = source.Distance(target);
+
+			// we want this as an "empty" action
+			if (sid == tid)
+				continue;
+
+			Fleet order(1, source.NumShips(), sid, tid, dist, dist);
+			orders.push_back(order);
+		}
+		actions.push_back(Action(orders, 0.0));
+
+		return;
+	}
+
+	for (int i = 0, n = PIDX.size(); i < n; i++)
+	{
+		planetStack.push_back(PIDX[i]);
+		GenerateActions(depth + 1, FLPIDX, PIDX, actions);
+		planetStack.pop_back();
+	}
+}
 
 
 
@@ -186,92 +223,146 @@ bool Defend(int turnsRemaining, int tid, std::vector<Planet>& AP, std::vector<Fl
 	return success;
 }
 
-bool Attack(int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
-				std::vector<int>& EFIDX, std::vector<Fleet>& orders, bool restore) {
+std::vector<AlphaBeta::Action> AlphaBeta::GetActions(Node& node, int depth) {
+	std::vector<Planet> ap(node.AP);
+	std::vector<Fleet>  af(node.AF);
 
-	Simulator sim;
-	bool canAttack = false;
-	Planet& source = AP[sid];
-	Planet& target = AP[tid];
-	const int dist = source.Distance(target);
-	sim.Start(dist, AP, AF, false, true);
-	int numShipsRequired = sim.GetPlanet(tid).NumShips();
-	int numShips = source.NumShips()-bot::GetIncommingFleets(sid, EFIDX);
-	canAttack = numShips > numShipsRequired;
-
-	if (canAttack)
+	// swap ownership on the enemy turn
+	if (depth % 2 == 1)
 	{
-		Fleet order(1, numShips, sid, tid, dist, dist);
-		source.Backup();
-		source.RemoveShips(numShips);
-		orders.push_back(order);
-		AF.push_back(order);
+		for (int i = 0, n = ap.size(); i < n; i++)
+		{
+			Planet& p = ap[i];
+			if (p.Owner() == 1)
+				p.Owner(2);
+			else
+			if (p.Owner() == 2)
+				p.Owner(1);
+		}
+		for (int i = 0, n = af.size(); i < n; i++)
+		{
+			Fleet& f = af[i];
+			if (f.Owner() == 1)
+				f.Owner(2);
+			else
+				f.Owner(1);
+		}
 	}
 
-	if (canAttack && restore)
+	bot::gAP = &ap;
+	bot::gAF = &af;
+	std::vector<int> NPIDX;  // neutral planets
+	std::vector<int> MPIDX;  // not targetted planets belonging to us
+	std::vector<int> EPIDX;  // enemy planets
+	std::vector<int> EFIDX;  // enemy fleets
+	std::vector<int> MFIDX;  // my fleets
+	std::vector<int> NMPIDX; // not my planets
+	Simulator end;
+	end.Start(MAX_TURNS-turn-depth/2, ap, af, false, true);
+	for (int i = 0, n = ap.size(); i < n; i++)
 	{
-		source.Restore();
-		AF.pop_back();
+		Planet& p = ap[i];
+		switch (p.Owner())
+		{
+			case 0:
+				if (!end.IsMyPlanet(i))
+				{
+					if (end.IsEnemyPlanet(i))
+						EPIDX.push_back(i);
+					else
+						NPIDX.push_back(i); 
+					NMPIDX.push_back(i);  
+				}
+			break;
+
+			case 1:  
+				MPIDX.push_back(i);
+			break;
+
+			default:
+				if (!end.IsMyPlanet(i))
+				{
+					EPIDX.push_back(i); 
+					NMPIDX.push_back(i);
+				}
+			break;
+		}
 	}
 
-	return canAttack;
-}
+	for (int i = 0, n = af.size(); i < n; i++)
+	{
+		Fleet& f = af[i];
+		if (f.Owner() == 1)
+			MFIDX.push_back(i);
+		else
+			EFIDX.push_back(i);
+	}
 
-std::vector<AlphaBeta::Action> AlphaBeta::GetActions(Node& n, int depth) {
-	std::priority_queue<Action> actions;
-	std::vector<Planet>& AP = n.AP;
-	std::vector<Fleet> & AF = n.AF;
-	std::vector<int> MPIDX;
-	std::vector<int> NMPIDX;
-	int owner = 0;
-	if (depth % 2 == 0)
-		owner = 1;
+	Map map(ap);
+	std::vector<int> FLPIDX = map.GetFrontLine();
+
+	std::vector<Action> actions;
+	if (turn == 0)
+		node.GenerateActions(0, FLPIDX, NPIDX, actions);
 	else
-		owner = 2;
-	int sid = -1;
-	int numShips = 0;
-	for (int i = 0, n = AP.size(); i < n; i++)
-	{
-		Planet& p = AP[i];
-		if (p.Owner() == owner)
-		{
-			if (p.NumShips() > numShips)
-			{
-				sid = p.PlanetID();
-				numShips = p.NumShips();
-			}
+	if (FLPIDX.size() > 2)
+		node.GenerateActions(0, FLPIDX, EPIDX, actions);
+	else
+		node.GenerateActions(0, FLPIDX, NMPIDX, actions);
 
-			MPIDX.push_back(i);
+	for (int i = 0, n = actions.size(); i < n; i++)
+	{
+		std::vector<Planet> AP(ap);
+		std::vector<Fleet>  AF(af);
+		Action& a = actions[i];
+		std::vector<Fleet>& orders = a.orders;
+
+		for (int j = 0, m = orders.size(); j < m; j++)
+		{
+			Fleet& order = orders[j];
+			AP[order.SourcePlanet()].RemoveShips(order.NumShips());
+			AF.push_back(order);
 		}
-		else NMPIDX.push_back(i);
-	}
 
-	std::vector<Fleet> orders;
-	actions.push(Action(orders, -1, -1));
-	if (sid != -1)
-	{
-		Planet& source = AP[sid];
-		for (int i = 0, n = NMPIDX.size(); i < n; i++)
+		// ---------------------------------------------------------------------------
+		// LOGD("FEED"); // support the frontline through routing
+		// ---------------------------------------------------------------------------
+		std::vector<Planet> AFP(AP); // all future planets
+		std::vector<Fleet>  AFF(AF); // all future fleets
+		end.Start(MAX_TURNS-turn, AFP, AFF);
+		Map fmap(AFP); // future map, to compute future frontline
+		std::vector<int>& FFLPIDX = fmap.GetFrontLine();
+
+		for (unsigned int j = 0, m = MPIDX.size(); j < m; j++)
 		{
-			Planet& target = AP[NMPIDX[i]];
-			int tid = target.PlanetID();
-			if (sid == tid)
+			Planet& source = AP[MPIDX[j]];
+			const int sid = source.PlanetID();
+			if (find(FFLPIDX.begin(), FFLPIDX.end(), sid) != FFLPIDX.end())
 				continue;
-			int dist = source.Distance(target);
-			Fleet order(owner, source.NumShips(), sid, tid, dist, dist);
+
+			const int tid = map.GetClosestPlanetIdx(source.Loc(), FFLPIDX);
+			if (tid == -1)
+				continue;
+
+			Planet& target = AP[tid];
+			const int dist = target.Distance(source);
+			const int numShips = source.NumShips() - bot::GetIncommingFleets(sid, EFIDX);
+			if (numShips <= 0)
+				continue;
+
+			const int hid = bot::GetHub(sid, tid);
+			Fleet order(1, numShips, sid, hid, dist, dist);
 			orders.push_back(order);
-			double value = target.GrowthRate()/(target.NumShips()*dist + 1.0);
-			actions.push(Action(orders, value, i));
-			orders.clear();
+			AF.push_back(order);
 		}
+
+		// compute the action value
+		end.Start(MAX_TURNS, AP, AF, false, true);
+		a.value = depth % 2 == 0 ? end.GetScore() : -end.GetScore();
+		a.value += i;
 	}
 
-	std::vector<Action> A;
-	while (!actions.empty())
-	{
-		A.push_back(actions.top());
-		actions.pop();
-	}
-
-	return A;
+	// sort actions for alpha beta efficiency
+	sort(actions.begin(), actions.end());
+	return actions;
 }

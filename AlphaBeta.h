@@ -21,6 +21,20 @@ public:
 		nodesVisited(0),
 		maxTime(maxTime_ - 0.01) {}
 
+	class Action {
+	public:
+		Action(): value(-1) {}
+		Action(std::vector<Fleet>& o, double v):
+			orders(o),
+			value(v) {}
+
+		std::vector<Fleet> orders;
+		double value;
+		bool operator< (const Action& a) const {
+			return value < a.value;
+		}
+	};
+
 	class Node {
 	public:
 		Node() {}
@@ -29,22 +43,8 @@ public:
 			AF(F) {}
 		std::vector<Planet> AP;
 		std::vector<Fleet>  AF;
-	};
-
-	class Action {
-	public:
-		Action(): value(-1), id(-666) {}
-		Action(std::vector<Fleet>& o, double v, int i):
-			orders(o),
-			value(v),
-			id(i) {}
-
-		std::vector<Fleet> orders;
-		double value;
-		int id;
-		bool operator< (const Action& a) const {
-			return value < a.value;
-		}
+		std::vector<int>    planetStack;
+		void GenerateActions(int, std::vector<int>&, std::vector<int>&, std::vector<AlphaBeta::Action>&);
 	};
 
 	std::vector<Fleet>& GetOrders(int turn, int plies);
