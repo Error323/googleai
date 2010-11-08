@@ -29,7 +29,6 @@ public:
 			AF(F) {}
 		std::vector<Planet> AP;
 		std::vector<Fleet>  AF;
-		friend std::ostream& operator<<(std::ostream&, const Node&);
 	};
 
 	class Action {

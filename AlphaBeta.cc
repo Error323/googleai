@@ -275,15 +275,3 @@ std::vector<AlphaBeta::Action> AlphaBeta::GetActions(Node& n, int depth) {
 
 	return A;
 }
-
-std::ostream& operator<<(std::ostream &out, const AlphaBeta::Node& node) {
-	for (int i = 0, n = node.AP.size(); i < n; i++)
-	{
-		out << node.AP[i];
-	}
-	for (int i = 0, n = node.AF.size(); i < n; i++)
-	{
-		out << node.AF[i];
-	}
-	return out;
-}
