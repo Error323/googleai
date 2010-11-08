@@ -189,11 +189,13 @@ void Simulator::Start(int totalTurns,
 
 		if (p.Owner() == 1)
 		{
+			myGrowth += p.GrowthRate();
 			myNumShips += p.NumShips();
 		}
 		else if (p.Owner() > 1)
 		{
 			enemyNumShips += p.NumShips();
+			enemyGrowth += p.GrowthRate();
 		}
 	}
 

@@ -12,6 +12,16 @@ struct NPV {
 	}
 };
 
+struct EPV {
+	EPV(): id(-1), val(-1.0) {}
+	EPV(int pid, double v): id(pid), val(v) {}
+	int id;
+	double val;
+	bool operator< (const EPV& epv) const {
+		return val > epv.val;
+	}
+};
+
 inline bool SortOnGrowthRateAndOwner(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
 	const Planet& b = gAP->at(pidB);

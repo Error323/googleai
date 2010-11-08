@@ -23,13 +23,18 @@ public:
 
 	class Action {
 	public:
-		Action(): value(-1) {}
-		Action(std::vector<Fleet>& o, double v):
+		Action(): value(0) {}
+
+		Action(std::vector<Fleet>& o):
+			orders(o),
+			value(0) {}
+
+		Action(std::vector<Fleet>& o, int v):
 			orders(o),
 			value(v) {}
 
 		std::vector<Fleet> orders;
-		double value;
+		int value;
 		bool operator< (const Action& a) const {
 			return value < a.value;
 		}
@@ -44,13 +49,21 @@ public:
 		std::vector<Planet> AP;
 		std::vector<Fleet>  AF;
 		std::vector<int>    planetStack;
-		void GenerateActions(int, std::vector<int>&, std::vector<int>&, std::vector<AlphaBeta::Action>&);
+		void GenerateActions(unsigned int, std::vector<int>&, std::vector<int>&, std::vector<AlphaBeta::Action>&);
 	};
 
 	std::vector<Fleet>& GetOrders(int turn, int plies);
 
 private:
+	enum weights {
+		EXPAND  = 1,
+		ATTACK  = 10,
+		DEFEND  = 100,
+		SNIPE   = 1000
+	};
+
 	std::vector<Action> GetActions(Node&, int);
+	std::vector<std::vector<AlphaBeta::Action> > CartesianProduct(unsigned int, std::vector<std::vector<AlphaBeta::Action> >&);
 	std::vector<Node> nodeStack;
 	Action bestAction;
 
@@ -58,7 +71,7 @@ private:
 	int bestScore;
 	int nodesVisited;
 
-	Simulator sim;
+	Simulator sim, end;
 	int turn;
 	int maxDepth;
 	double maxTime;

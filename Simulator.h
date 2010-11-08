@@ -40,11 +40,14 @@ public:
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }
+	int GetHeuristicScore()			{ return (myGrowth*myGrowth+myNumShips) - (enemyGrowth*enemyGrowth+enemyNumShips); }
 	Planet& GetPlanet(int i)		{ return AP->at(i); }
 
 private:
 	int myNumShips;
 	int enemyNumShips;
+	int myGrowth;
+	int enemyGrowth;
 	std::vector<Planet> _AP;
 	std::vector<Fleet> _AF;
 	std::vector<Planet>* AP;

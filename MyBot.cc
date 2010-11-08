@@ -18,7 +18,7 @@ void DoTurn(PlanetWars& pw, int depth) {
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
 
-	AlphaBeta alphabeta(pw, 10.0);
+	AlphaBeta alphabeta(pw, 1000.0);
 
 	std::vector<Fleet> orders = alphabeta.GetOrders(turn, depth);
 
@@ -55,23 +55,12 @@ int main(int argc, char *argv[]) {
 		depth = atoi(argv[1]);
 
 	#ifdef DEBUG
-	time_t t;
-	time(&t);
-	struct tm* lt = localtime(&t);
 	char buf[1024] = {0};
 	snprintf(
 		buf,
 		1024 - 1,
-		"%s-%02d-%02d-%04d_%02d%02d.txt",
-		argv[0],
-		0,0,0,0,0
-		/*
-		lt->tm_mon + 1,
-		lt->tm_mday,
-		lt->tm_year + 1900,
-		lt->tm_hour,
-		lt->tm_min
-		*/
+		"%s.txt",
+		argv[0]
 	);
 	signal(SIGSEGV, SigHandler);
 	Logger logger(buf);
