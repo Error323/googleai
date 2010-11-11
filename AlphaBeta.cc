@@ -141,13 +141,13 @@ int AlphaBeta::GetScore(Node& node, int depth) {
 	for (int i = 0, n = node.AF.size(); i < n; i++)
 	{
 		Fleet& f = node.AF[i];
-		if (f.Owner() == 1)
-			MFIDX.push_back(i);
-		else
-			EFIDX.push_back(i);
-
 		if (f.TotalTripLength() - f.TurnsRemaining() <= depth/2)
 		{
+			if (f.Owner() == 1)
+				MFIDX.push_back(i);
+			else
+				EFIDX.push_back(i);
+
 			int sid = f.SourcePlanet();
 			int tid = f.DestinationPlanet();
 			if (find(PIDX.begin(), PIDX.end(), sid) == PIDX.end())

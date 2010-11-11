@@ -57,9 +57,9 @@ public:
 private:
 	enum weights {
 		EXPAND  = 1,
-		ATTACK  = 10,
+		ATTACK  = 100,
 		DEFEND  = 100,
-		SNIPE   = 1000
+		SNIPE   = 100
 	};
 
 	std::vector<Action> GetActions(Node&, int);
