@@ -19,61 +19,12 @@
 	#include <signal.h>
 #endif
 
-
-#define VERSION "17.0"
-
-
 PlanetWars* gPW = NULL;
 int turn        = 0;
 int MAX_TURNS   = 200;
 
 namespace bot {
 	#include "Helper.inl"
-}
-
-struct NPV {
-	NPV(): id(-1), val(-1.0) {}
-	NPV(int pid, double v): id(pid), val(v) {}
-	int id;
-	double val;
-	bool operator< (const NPV& npv) const {
-		return val < npv.val;
-	}
-};
-
-double GetValue(Planet& p, int dist) {
-	#define EPS 1.0e-10
-	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
-}
-
-int GetIncommingFleets(const int sid, std::vector<int>& FIDX, int remaining = std::numeric_limits<int>::max()) {
-	int numFleets = 0;
-	for (unsigned int j = 0, m = FIDX.size(); j < m; j++)
-	{
-		const Fleet& f = bot::gAF->at(FIDX[j]);
-		if (f.DestinationPlanet() == sid && f.TurnsRemaining() <= remaining)
-		{
-			numFleets += f.NumShips();
-		}
-	}
-	return numFleets;
-}
-
-int GetStrength(const int tid, const int dist, std::vector<int>& PIDX, std::vector<int>& FIDX) {
-	int strength = 0;
-	const Planet& target = bot::gAP->at(tid);
-	for (unsigned int i = 0, n = PIDX.size(); i < n; i++)
-	{
-		const Planet& p = bot::gAP->at(PIDX[i]);
-		const int pid = p.PlanetID();
-		int distance = target.Distance(p);
-		if (distance < dist && pid != tid)
-		{
-			int time = dist - distance;
-			strength += p.NumShips() + time*p.GrowthRate() + GetIncommingFleets(pid, FIDX, time);
-		}
-	}
-	return strength;
 }
 
 bool Defend(int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
@@ -101,7 +52,7 @@ bool Defend(int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 		source.Backup();
 		sim.Start(enemy.time, AP, AF, false, true);
 		int numShips = sim.GetPlanet(tid).NumShips();
-		numShips = std::min<int>(numShips, source.NumShips()-GetIncommingFleets(sid, EFIDX));
+		numShips = std::min<int>(numShips, source.NumShips()-bot::GetIncommingFleets(sid, EFIDX));
 
 		if (numShips <= 0)
 			continue;
@@ -138,7 +89,7 @@ bool Attack(int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 	const int dist = source.Distance(target);
 	sim.Start(dist, AP, AF, false, true);
 	int numShipsRequired = sim.GetPlanet(tid).NumShips();
-	int numShips = source.NumShips()-GetIncommingFleets(sid, EFIDX);
+	int numShips = source.NumShips()-bot::GetIncommingFleets(sid, EFIDX);
 	canAttack = numShips > numShipsRequired;
 
 	if (canAttack)
@@ -311,7 +262,7 @@ void DoTurn(PlanetWars& pw) {
 					continue;
 
 				const int dist = target.Distance(source);
-				int strength = GetStrength(tid, dist, EPIDX, EFIDX) + target.NumShips();
+				int strength = bot::GetStrength(tid, dist, EPIDX, EFIDX) + target.NumShips();
 				if (strength < weakest)
 				{
 					weakest = strength;
@@ -367,7 +318,7 @@ void DoTurn(PlanetWars& pw) {
 			Planet& e = AP[eid];
 			const int dist = p.Distance(e);
 			int numShips = p.NumShips() - e.NumShips() -
-				GetIncommingFleets(pid, EFIDX) + dist*p.GrowthRate();
+				bot::GetIncommingFleets(pid, EFIDX) + dist*p.GrowthRate();
 
 			numShips = std::min<int>(numShips, p.NumShips());
 			if (numShips > 0)
@@ -400,7 +351,7 @@ void DoTurn(PlanetWars& pw) {
 					closer = mdist2target <= edist2target;
 				else
 					closer = mdist2target < edist2target;
-				const bool defend = source.NumShips() - GetIncommingFleets(source.PlanetID(), EFIDX) > 0;
+				const bool defend = source.NumShips() - bot::GetIncommingFleets(source.PlanetID(), EFIDX) > 0;
 				if (closer && defend)
 				{
 					candidates.push_back(target.PlanetID());
@@ -411,15 +362,15 @@ void DoTurn(PlanetWars& pw) {
 
 		// 3. Apply binary knapsack algorithm to select the best candidates
 		std::vector<int> w; std::vector<double> v;
-		std::priority_queue<NPV> PQ;
+		std::priority_queue<bot::NPV> PQ;
 		for (unsigned int i = 0, n = candidates.size(); i < n; i++)
 		{
 			Planet& candidate = AP[candidates[i]];
 			w.push_back(candidate.NumShips() + 1);
 			const int dist = (avgLoc - candidate.Loc()).len2D();
-			double value = GetValue(candidate, dist);
+			double value = bot::GetValue(candidate, dist);
 			v.push_back(value);
-			PQ.push(NPV(candidate.PlanetID(), value));
+			PQ.push(bot::NPV(candidate.PlanetID(), value));
 		}
 
 		if (!candidates.empty() && !MHPIDX.empty())
@@ -442,7 +393,7 @@ void DoTurn(PlanetWars& pw) {
 						const int sid = source.PlanetID();
 						const int dist = target.Distance(source);
 						int numShips = std::min<int>(target.NumShips() + 1, numShipsToSpare[sid]);
-						numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, EFIDX));
+						numShips = std::min<int>(numShips, source.NumShips() - bot::GetIncommingFleets(sid, EFIDX));
 						if (numShips <= 0 || source.NumShips() <= 0)
 							continue;
 
@@ -492,7 +443,7 @@ void DoTurn(PlanetWars& pw) {
 					const int dist = target.Distance(source);
 					sim.Start(dist, AP, AF, false, true);
 					int numShips = std::min<int>(sim.GetPlanet(tid).NumShips() + 1, numShipsToSpare[sid]);
-					numShips = std::min<int>(numShips, source.NumShips() - GetIncommingFleets(sid, EFIDX));
+					numShips = std::min<int>(numShips, source.NumShips() - bot::GetIncommingFleets(sid, EFIDX));
 					if (numShips <= 0)
 						continue;
 
@@ -557,12 +508,12 @@ void DoTurn(PlanetWars& pw) {
 					break;
 
 				// only snipe when we are locally stronger
-				if (GetStrength(tid, dist, NTPIDX, MFIDX) < GetStrength(tid, dist, EPIDX, EFIDX))
+				if (bot::GetStrength(tid, dist, NTPIDX, MFIDX) < bot::GetStrength(tid, dist, EPIDX, EFIDX))
 					continue;
 
 				sim.Start(dist, AP, AF, false, true);
 				int numShips =
-					std::min<int>(source.NumShips()-GetIncommingFleets(sid,
+					std::min<int>(source.NumShips()-bot::GetIncommingFleets(sid,
 					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
 
 				if (numShips > 0)
@@ -618,7 +569,7 @@ void DoTurn(PlanetWars& pw) {
 
 		Planet& target = AP[tid];
 		const int dist = target.Distance(source);
-		const int numShips = source.NumShips()-GetIncommingFleets(sid, EFIDX);
+		const int numShips = source.NumShips()-bot::GetIncommingFleets(sid, EFIDX);
 		if (numShips <= 0)
 			continue;
 
@@ -633,7 +584,7 @@ void DoTurn(PlanetWars& pw) {
 
 #ifdef DEBUG
 void SigHandler(int signum) {
-	Logger logger(std::string(VERSION) + "-crash.txt");
+	Logger logger("crash.txt");
 	logger.Log(gPW->ToString());
 	signal(signum, SIG_DFL);
 	kill(getpid(), signum);
