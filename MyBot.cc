@@ -444,10 +444,28 @@ void DoTurn(PlanetWars& pw) {
 			{
 				KnapSack ks(w, v, totalNumShipsToSpare);
 				std::vector<int> I = ks.Indices();
+				std::vector<int> skip;
 				for (unsigned int i = 0, n = I.size(); i < n; i++)
 				{
 					Planet& target = AP[candidates[I[i]]];
 					const int tid = target.PlanetID();
+					const int sid = MHPIDX[0];
+					const int eid = EPIDX[0];
+					Planet& source = AP[sid];
+					Planet& enemy = AP[eid];
+					const int mdist = target.Distance(source);
+					const int edist = target.Distance(enemy);
+					if (mdist == edist)
+						skip.push_back(tid);
+				}
+
+				for (unsigned int i = 0, n = I.size(); i < n; i++)
+				{
+					Planet& target = AP[candidates[I[i]]];
+					const int tid = target.PlanetID();
+					if (find(skip.begin(), skip.end(), tid) != skip.end())
+						continue;
+
 					bool success = true;
 					bot::gTarget = tid;
 					sort(MHPIDX.begin(), MHPIDX.end(), bot::SortOnDistanceToTarget);
