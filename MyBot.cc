@@ -226,6 +226,77 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<Fleet> orders;
 
 	// ---------------------------------------------------------------------------
+	LOG("SNIPE"); // overtake neutral planets captured by the enemy
+	// ---------------------------------------------------------------------------
+	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
+	{
+		Planet& target = AP[NPIDX[i]];
+		const int tid = target.PlanetID();
+		if (end.IsEnemyPlanet(tid))
+		{
+			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
+			bot::gTarget = tid;
+			sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
+			bool success = false;
+			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
+			{
+				Planet& source = AP[NTPIDX[j]];
+				const int sid = source.PlanetID();
+				const int dist = target.Distance(source);
+
+				// not enough ships
+				if (source.NumShips() <= 0)
+					continue;
+
+				sim.Start(dist, AP, AF, false, true);
+				int numShips =
+					std::min<int>(source.NumShips()-bot::GetIncommingFleets(sid,
+					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
+
+
+				// we don't wanna be sniped, just wait and reserve ships
+				if (dist <= enemy.time)
+				{
+					source.RemoveShips(std::min<int>(source.NumShips(), numShips));
+					break;
+				}
+
+				// only snipe when we are locally stronger
+				if (dist > enemy.time+1 && bot::GetStrength(tid, dist, NTPIDX, MFIDX) < bot::GetStrength(tid, dist, EPIDX, EFIDX))
+					continue;
+
+				if (numShips > 0)
+				{
+					Fleet order(1, numShips, sid, tid, dist, dist);
+					orders.push_back(order);
+					AF.push_back(order);
+					source.Backup();
+					source.RemoveShips(numShips);
+
+					sim.Start(dist, AP, AF, false, true);
+					if (sim.IsMyPlanet(tid))
+					{
+						success = true;
+						break;
+					}
+				}
+			}
+			if (success)
+			{
+				IssueOrders(orders);
+			}
+			else
+			{
+				for (unsigned int j = 0, m = orders.size(); j < m; j++)
+					AP[orders[j].SourcePlanet()].Restore();
+
+				AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
+				orders.clear();
+			}
+		}
+	}
+
+	// ---------------------------------------------------------------------------
 	LOG("DEFEND AND ATTACK"); // sort planets on growthrate and perform attack
 	// ---------------------------------------------------------------------------
 	std::vector<int> DAPIDX;
@@ -275,21 +346,20 @@ void DoTurn(PlanetWars& pw) {
 	for (unsigned int i = 0, n = DAPIDX.size(); i < n; i++)
 	{
 		Planet& target = AP[DAPIDX[i]];
-		LOG(target.GrowthRate());
 		const int tid = target.PlanetID();
 		if (target.Owner() <= 1)
 		{
 			if (Defend(tid, AP, AF, NTPIDX, EFIDX, orders, false))
-			{
 				IssueOrders(orders);
-			}
+			else
+				break;
 		}
 		else
 		{
 			if (Attack(targets[tid], tid, AP, AF, EFIDX, orders, false))
-			{
 				IssueOrders(orders);
-			}
+			else
+				break;
 		}
 	}
 
@@ -470,73 +540,6 @@ void DoTurn(PlanetWars& pw) {
 					int sid = map.GetClosestPlanetIdx(target.Loc(), MHPIDX);
 					AP[sid].NumShips(0);
 				}
-			}
-		}
-	}
-
-	// ---------------------------------------------------------------------------
-	LOG("SNIPE"); // overtake neutral planets captured by the enemy
-	// ---------------------------------------------------------------------------
-	for (unsigned int i = 0, n = NPIDX.size(); i < n; i++)
-	{
-		Planet& target = AP[NPIDX[i]];
-		const int tid = target.PlanetID();
-		if (end.IsEnemyPlanet(tid))
-		{
-			Simulator::PlanetOwner& enemy = end.GetFirstEnemyOwner(tid);
-			bot::gTarget = tid;
-			sort(NTPIDX.begin(), NTPIDX.end(), bot::SortOnDistanceToTarget);
-			bool success = false;
-			for (unsigned int j = 0, m = NTPIDX.size(); j < m; j++)
-			{
-				Planet& source = AP[NTPIDX[j]];
-				const int sid = source.PlanetID();
-				const int dist = target.Distance(source);
-
-				// not enough ships
-				if (source.NumShips() <= 0)
-					continue;
-
-				// we don't wanna be sniped, just wait
-				if (dist <= enemy.time)
-					break;
-
-				// only snipe when we are locally stronger
-				if (bot::GetStrength(tid, dist, NTPIDX, MFIDX) < bot::GetStrength(tid, dist, EPIDX, EFIDX))
-					continue;
-
-				sim.Start(dist, AP, AF, false, true);
-				int numShips =
-					std::min<int>(source.NumShips()-bot::GetIncommingFleets(sid,
-					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
-
-				if (numShips > 0)
-				{
-					Fleet order(1, numShips, sid, tid, dist, dist);
-					orders.push_back(order);
-					AF.push_back(order);
-					source.Backup();
-					source.RemoveShips(numShips);
-
-					sim.Start(dist, AP, AF, false, true);
-					if (sim.IsMyPlanet(tid))
-					{
-						success = true;
-						break;
-					}
-				}
-			}
-			if (success)
-			{
-				IssueOrders(orders);
-			}
-			else
-			{
-				for (unsigned int j = 0, m = orders.size(); j < m; j++)
-					AP[orders[j].SourcePlanet()].Restore();
-
-				AF.erase(AF.begin() + AF.size() - orders.size(), AF.end());
-				orders.clear();
 			}
 		}
 	}
