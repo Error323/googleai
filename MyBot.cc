@@ -187,13 +187,11 @@ void DoTurn(PlanetWars& pw) {
 		{
 			case 0: 
 			{
-				if (p.GrowthRate() == 0)
-					continue;
-
-				if (end.IsSniped(pid))
-					TPIDX.push_back(pid);
-				else if (!end.IsMyPlanet(pid))
+				if (!end.IsMyPlanet(pid) && p.GrowthRate() > 0)
 					NPIDX.push_back(pid);
+				else
+				if (end.IsEnemyPlanet(pid))
+					EPIDX.push_back(pid);
 			} break;
 
 			case 1: 
@@ -219,13 +217,9 @@ void DoTurn(PlanetWars& pw) {
 	{
 		Fleet& f = AF[i];
 		if (f.Owner() == 1)
-		{
 			MFIDX.push_back(i);
-		}
 		else
-		{
 			EFIDX.push_back(i);
-		}
 	}
 	Map map(AP);
 	std::vector<int>& FLPIDX = map.GetFrontLine();

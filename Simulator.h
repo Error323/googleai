@@ -34,6 +34,7 @@ public:
 	PlanetOwner& GetFirstEnemyOwner(int i);
 
 	bool Winning()					{ return myNumShips > enemyNumShips; }
+	bool IsNeutralPlanet(int i) 	{ return AP->at(i).Owner() == 0; }
 	bool IsMyPlanet(int i) 			{ return AP->at(i).Owner() == 1; }
 	bool IsEnemyPlanet(int i) 		{ return AP->at(i).Owner() > 1; }
 	bool IsSniped(int i);
