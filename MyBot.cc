@@ -79,7 +79,7 @@ bool Defend(int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 	return success;
 }
 
-bool Attack(int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
+bool Attack(Map& map, std::vector<int>& EPIDX, int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 				std::vector<int>& EFIDX, std::vector<Fleet>& orders, bool restore) {
 
 	Simulator sim;
@@ -91,6 +91,18 @@ bool Attack(int sid, int tid, std::vector<Planet>& AP, std::vector<Fleet>& AF,
 	int numShipsRequired = sim.GetPlanet(tid).NumShips();
 	int numShips = source.NumShips()-bot::GetIncommingFleets(sid, EFIDX);
 	canAttack = numShips > numShipsRequired;
+
+	if (canAttack)
+	{
+		int eid = map.GetClosestPlanetIdx(source.Loc(), EPIDX);
+		if (eid != tid)
+		{
+			const int time = source.Distance(AP[eid]);
+			numShips -= AP[eid].NumShips() - time*source.GrowthRate();
+			numShips = std::min<int>(source.NumShips()-bot::GetIncommingFleets(sid, EFIDX), numShips);
+			canAttack = numShips > numShipsRequired;
+		}
+	}
 
 	if (canAttack)
 	{
@@ -189,9 +201,6 @@ void DoTurn(PlanetWars& pw) {
 			{
 				if (!end.IsMyPlanet(pid) && p.GrowthRate() > 0)
 					NPIDX.push_back(pid);
-				else
-				if (end.IsEnemyPlanet(pid))
-					EPIDX.push_back(pid);
 			} break;
 
 			case 1: 
@@ -334,7 +343,7 @@ void DoTurn(PlanetWars& pw) {
 					bestTarget = tid;
 				}
 			}
-			if (bestTarget != -1 && Attack(sid, bestTarget, AP, AF, EFIDX, orders, true))
+			if (bestTarget != -1 && Attack(map, EPIDX, sid, bestTarget, AP, AF, EFIDX, orders, true))
 			{
 				targets[bestTarget] = sid;
 				DAPIDX.push_back(bestTarget);
@@ -356,7 +365,7 @@ void DoTurn(PlanetWars& pw) {
 		}
 		else
 		{
-			if (Attack(targets[tid], tid, AP, AF, EFIDX, orders, false))
+			if (Attack(map, EPIDX, targets[tid], tid, AP, AF, EFIDX, orders, false))
 				IssueOrders(orders);
 			else
 				break;
