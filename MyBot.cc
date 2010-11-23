@@ -187,6 +187,10 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<int> MFIDX;  // my fleets
 
 	Simulator end, sim;
+#ifdef DEBUG
+	sim.Start(0, AP, AF, false, true);
+	LOG("SCORE: "<<sim.GetScore());
+#endif
 	end.Start(MAX_TURNS-turn, AP, AF, false, true);
 
 	vec3<double> mAvgLoc(0.0, 0.0, 0.0);
