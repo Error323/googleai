@@ -123,40 +123,6 @@ bool Attack(Map& map, std::vector<int>& EPIDX, int sid, int tid, std::vector<Pla
 	return canAttack;
 }
 
-int GetHub(const int sid, const int tid) {
-	#define BETWEEN(v, a, b) ((v > a && v < b) || (v < a && v > b))
-	static const double MAX_DETOUR = 1.0;
-
-	int hid = tid;
-	const Planet& source = bot::gAP->at(sid);
-	const Planet& target = bot::gAP->at(tid);
-	vec3<double> vecTarget = target.Loc() - source.Loc();
-	double distance = vecTarget.len2D();
-	double s2t = distance;
-	for (unsigned int i = 0, n = bot::gAP->size(); i < n; i++)
-	{
-		const Planet& hub = bot::gAP->at(i);
-		if (hub.Owner() == source.Owner() && hub.PlanetID() != tid && hub.PlanetID() != sid)
-		{
-			vec3<double> vecHub = hub.Loc() - source.Loc();
-			vec3<double> vecProjectHub = vecHub.project(vecTarget);
-			if (BETWEEN(vecProjectHub.x, 0.0, vecTarget.x) && BETWEEN(vecProjectHub.z, 0.0, vecTarget.z))
-			{
-				const double s2h = vecHub.len2D();
-				const double h2t = (hub.Loc() - target.Loc()).len2D();
-				const double pLength = vecProjectHub.len2D();
-				const double detour  = (s2h + h2t) - s2t;
-				if (pLength < distance && detour <= MAX_DETOUR)
-				{
-					hid = hub.PlanetID();
-					distance = pLength;
-				}
-			}
-		}
-	}
-	return hid;
-}
-
 void IssueOrders(std::vector<Fleet>& orders) {
 	for (unsigned int i = 0, n = orders.size(); i < n; i++)
 	{
@@ -601,7 +567,7 @@ void DoTurn(PlanetWars& pw) {
 		if (numShips <= 0)
 			continue;
 
-		const int hid = GetHub(sid, tid);
+		const int hid = bot::GetHub(sid, tid);
 		Fleet order(1, numShips, sid, hid, dist, dist);
 		AF.push_back(order);
 		orders.push_back(order);
