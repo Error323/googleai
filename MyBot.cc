@@ -236,7 +236,6 @@ void DoTurn(PlanetWars& pw) {
 				// we don't wanna be sniped, just wait and reserve ships
 				if (dist <= enemy.time)
 				{
-					source.RemoveShips(std::min<int>(source.NumShips(), numShips));
 					break;
 				}
 
