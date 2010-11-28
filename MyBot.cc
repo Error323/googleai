@@ -143,8 +143,8 @@ void DoTurn(PlanetWars& pw) {
 	std::vector<Planet> AP = pw.Planets();
 	std::vector<Fleet>  AF = pw.Fleets();
 	gPW                    = &pw;
-	bot::gAP               = &AP;
-	bot::gAF               = &AF;
+	bot::gAP               = &AP; // all planets
+	bot::gAF               = &AF; // all fleets
 	std::vector<int> NPIDX;  // neutral planets
 	std::vector<int> EPIDX;  // enemy planets
 	std::vector<int> TPIDX;  // targetted planets belonging to us
@@ -233,13 +233,13 @@ void DoTurn(PlanetWars& pw) {
 					EFIDX), sim.GetPlanet(tid).NumShips() + 1);
 
 
-				// we don't wanna be sniped, just wait and reserve ships
+				// we don't wanna be sniped, just wait
 				if (dist <= enemy.time)
 				{
 					break;
 				}
 
-				// only snipe when we are locally stronger
+				// only snipe when we are locally stronger or equal and the timedelay = 1
 				if (dist > enemy.time+1 && bot::GetStrength(tid, dist, NTPIDX, MFIDX) < bot::GetStrength(tid, dist, EPIDX, EFIDX))
 					continue;
 
@@ -277,6 +277,7 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("DEFEND AND ATTACK"); // sort planets on growthrate and perform attack
 	// ---------------------------------------------------------------------------
+	// gather all planets that are under attack and we can defend
 	std::vector<int> DAPIDX;
 	for (unsigned int i = 0, n = TPIDX.size(); i < n; i++)
 	{
@@ -288,6 +289,8 @@ void DoTurn(PlanetWars& pw) {
 		}
 	}
 
+	// gather all enemy planets that we can attack and that are weak, each
+	// frontline ship gets assigned an enemy planet (they may overlap)
 	std::map<int,int> targets;
 	if (!EPIDX.empty())
 	{
@@ -320,6 +323,7 @@ void DoTurn(PlanetWars& pw) {
 		}
 	}
 
+	// sort both attack/defend on growthrate and apply the orders
 	sort(DAPIDX.begin(), DAPIDX.end(), bot::SortOnGrowthRateAndOwner);
 	for (unsigned int i = 0, n = DAPIDX.size(); i < n; i++)
 	{
@@ -402,7 +406,6 @@ void DoTurn(PlanetWars& pw) {
 			}
 		}
 
-		// 3. Apply binary knapsack algorithm to select the best candidates
 		std::vector<int> w; std::vector<double> v;
 		std::priority_queue<bot::NPV> PQ;
 		for (unsigned int i = 0, n = candidates.size(); i < n; i++)
@@ -417,7 +420,9 @@ void DoTurn(PlanetWars& pw) {
 
 		if (!candidates.empty() && !MHPIDX.empty())
 		{
-			// use the knapsack algorithm on turn 0
+			// 3. Apply binary knapsack algorithm to select the best candidates on turn 0
+			// skipping planets here which have the same distance to us and the enemy, this
+			// way we can snipe those planets if the enemy captures them.
 			if (turn == 0)
 			{
 				KnapSack ks(w, v, totalNumShipsToSpare);
@@ -543,6 +548,8 @@ void DoTurn(PlanetWars& pw) {
 	// ---------------------------------------------------------------------------
 	LOG("FEED"); // support the frontline through routing
 	// ---------------------------------------------------------------------------
+	// compute the future frontline and use all non target planets for feeding this
+	// frontline
 	std::vector<Planet> AFP(AP); // all future planets
 	std::vector<Fleet>  AFF(AF); // all future fleets
 	end.Start(MAX_TURNS-turn, AFP, AFF);

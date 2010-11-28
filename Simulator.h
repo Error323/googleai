@@ -37,7 +37,6 @@ public:
 	bool IsNeutralPlanet(int i) 	{ return AP->at(i).Owner() == 0; }
 	bool IsMyPlanet(int i) 			{ return AP->at(i).Owner() == 1; }
 	bool IsEnemyPlanet(int i) 		{ return AP->at(i).Owner() > 1; }
-	bool IsSniped(int i);
 	int MyNumShips()				{ return myNumShips; }
 	int EnemyNumShips()				{ return enemyNumShips; }
 	int GetScore()					{ return myNumShips - enemyNumShips; }
@@ -46,12 +45,12 @@ public:
 private:
 	int myNumShips;
 	int enemyNumShips;
-	std::vector<Planet> _AP;
-	std::vector<Fleet> _AF;
-	std::vector<Planet>* AP;
-	std::vector<Fleet>* AF;
-	// <planet, vec<owner, time> >
-	std::map<int, std::vector<PlanetOwner> > ownershipHistory;
+	std::vector<Planet> copyAP; // local deepcopy of all planets
+	std::vector<Fleet> copyAF;  // local deepcopy of all fleets
+	std::vector<Planet>* AP; // active planets, either from the deepcopy or passed by reference from Start()
+	std::vector<Fleet>* AF;  // active fleets, either from the deepcopy or passed by reference from Start()
+	std::map<int, std::vector<PlanetOwner> > ownershipHistory; // history record of fleet impacts in a planet
+
 	void ChangeOwner(Planet& p, int owner, int time, int force);
 };
 

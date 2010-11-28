@@ -1,6 +1,7 @@
 const std::vector<Planet>* gAP     = NULL;
 const std::vector<Fleet>*  gAF     = NULL;
 int                        gTarget = 0;
+vec3<double>*              gCenter = NULL;
 
 inline bool SortOnGrowthRateAndOwner(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
@@ -56,11 +57,13 @@ struct NPV {
 	}
 };
 
+// Determine the "goodness" of a neutral planet
 double GetValue(Planet& p, int dist) {
 	#define EPS 1.0e-10
-	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
+	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * (p.Loc() - *gCenter).len2D() + EPS);
 }
 
+// Get the incomming fleets of a certain planet
 int GetIncommingFleets(const int sid, std::vector<int>& FIDX, int remaining = 1000) {
 	int numFleets = 0;
 	for (unsigned int j = 0, m = FIDX.size(); j < m; j++)
@@ -74,6 +77,7 @@ int GetIncommingFleets(const int sid, std::vector<int>& FIDX, int remaining = 10
 	return numFleets;
 }
 
+// Compute the potential strength if all planets in the neighbourhood will feed this planet
 int GetStrength(const int tid, const int dist, std::vector<int>& PIDX, std::vector<int>& FIDX) {
 	int strength = 0;
 	const Planet& target = gAP->at(tid);
@@ -91,6 +95,7 @@ int GetStrength(const int tid, const int dist, std::vector<int>& PIDX, std::vect
 	return strength;
 }
 
+// Determine the closest-to-source in between lying hub for rerouting
 int GetHub(const int sid, const int tid) {
 	#define BETWEEN(v, a, b) ((v > a && v < b) || (v < a && v > b))
 	static const double MAX_DETOUR = 1.0;
