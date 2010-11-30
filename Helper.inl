@@ -1,7 +1,6 @@
 const std::vector<Planet>* gAP     = NULL;
 const std::vector<Fleet>*  gAF     = NULL;
 int                        gTarget = 0;
-vec3<double>*              gCenter = NULL;
 
 inline bool SortOnGrowthRateAndOwner(const int pidA, const int pidB) {
 	const Planet& a = gAP->at(pidA);
@@ -60,7 +59,7 @@ struct NPV {
 // Determine the "goodness" of a neutral planet
 double GetValue(Planet& p, int dist) {
 	#define EPS 1.0e-10
-	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * (p.Loc() - *gCenter).len2D() + EPS);
+	return pow(p.GrowthRate(), 2.0) / (p.NumShips() * dist + EPS);
 }
 
 // Get the incomming fleets of a certain planet
